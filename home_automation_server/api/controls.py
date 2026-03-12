@@ -92,3 +92,28 @@ async def send_power(body: PowerRequest, session: SessionDep):
         "power": "on" if body.turn_on else "off",
     }
 
+
+@router.get("/power-state/{device_id}", summary="Get current power state")
+async def get_power_state(device_id: int, session: SessionDep):
+    device, credentials = _get_device_and_credentials(device_id, session)
+
+    try:
+        power = await pyatv_service.get_power_state(
+            device.identifier,
+            device.ip_address,
+            credentials,
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        if "not supported" in message.lower():
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=message)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=message)
+
+    return {
+        "status": "ok",
+        "device": device.name,
+        "power_state": power["state"],
+        "is_on": power["is_on"],
+    }
+
+

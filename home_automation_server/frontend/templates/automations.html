@@ -16,7 +16,7 @@
     <form class="form" onsubmit="createFlow(event)">
         <label>Name <input type="text" id="flow-name" required placeholder="Open Netflix on startup" /></label>
         <label>Device
-            <select id="flow-device-id">
+            <select id="flow-device-id" onchange="onDeviceChanged()">
                 {% for device in devices %}
                 <option value="{{ device.id }}">{{ device.name }}</option>
                 {% endfor %}
@@ -26,28 +26,71 @@
             <select id="flow-trigger-type">
                 <option value="webhook">Webhook</option>
                 <option value="manual">Manual</option>
-                <option value="schedule">Schedule</option>
+                <option value="schedule" disabled>Schedule (coming soon)</option>
             </select>
         </label>
-        <label>Trigger Payload (JSON) <input type="text" id="flow-trigger-payload" value="{}" /></label>
-        <label>Action Type
-            <select id="flow-action-type">
-                <option value="launch_app">Launch App</option>
-                <option value="remote_command">Remote Command</option>
-                <option value="power">Power</option>
-            </select>
-        </label>
-        <label>Action Payload (JSON)
-            <input type="text" id="flow-action-payload" value='{"bundle_id":"com.netflix.Netflix"}' />
-        </label>
-        <button type="submit" class="btn btn-primary">Save Flow</button>
+
+        <div class="notice" id="flow-builder-status" style="display:none;"></div>
+
+        <input type="hidden" id="editing-flow-id" value="" />
+
+        <div class="automation-builder">
+            <div class="automation-palette">
+                <h3>Action Palette</h3>
+                <p class="subtitle">Drag actions into the sequence or click add.</p>
+
+                <div class="palette-item" draggable="true" data-action-kind="power_on" ondragstart="onPaletteDragStart(event)">
+                    <span>⚡ Power On</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('power_on')">Add</button>
+                </div>
+
+                <div class="palette-item" draggable="true" data-action-kind="power_off" ondragstart="onPaletteDragStart(event)">
+                    <span>🌙 Power Off</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('power_off')">Add</button>
+                </div>
+
+                <div class="palette-item" draggable="true" data-action-kind="launch_app" ondragstart="onPaletteDragStart(event)">
+                    <span>📦 Launch App</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('launch_app')">Add</button>
+                </div>
+
+                <div class="palette-item" draggable="true" data-action-kind="remote_command" ondragstart="onPaletteDragStart(event)">
+                    <span>🎮 Remote Command</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('remote_command')">Add</button>
+                </div>
+
+                <div class="palette-item" draggable="true" data-action-kind="wait_seconds" ondragstart="onPaletteDragStart(event)">
+                    <span>⏱ Wait</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('wait_seconds')">Add</button>
+                </div>
+
+                <div class="palette-item" draggable="true" data-action-kind="swipe" ondragstart="onPaletteDragStart(event)">
+                    <span>👆 Swipe</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('swipe')">Add</button>
+                </div>
+
+                <button type="button" class="btn btn-secondary" onclick="loadAppsForDevice(true)">🔄 Refresh App List</button>
+            </div>
+
+            <div class="automation-sequence" id="flow-dropzone" ondragover="onDropzoneDragOver(event)" ondrop="onDropzoneDrop(event)">
+                <h3>Sequence</h3>
+                <p class="subtitle">Drop actions here. Steps execute top → bottom.</p>
+                <div id="flow-steps"></div>
+            </div>
+        </div>
+
+        <div class="controls-button-row">
+            <button type="submit" id="save-flow-btn" class="btn btn-primary">Save Flow</button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden" onclick="cancelEditMode()">Cancel Edit</button>
+        </div>
     </form>
 </details>
 
 <!-- Flow list -->
 <h2 style="margin-top:2rem;">Saved Flows</h2>
 {% if flows %}
-<table class="data-table">
+<!-- Desktop Table View -->
+<table class="data-table data-table-desktop">
     <thead>
         <tr>
             <th>Name</th>
@@ -65,16 +108,55 @@
             <td><span class="badge badge-trigger">{{ flow.trigger_type }}</span></td>
             <td><span class="badge badge-action">{{ flow.action_type }}</span></td>
             <td>
-                <button class="btn btn-sm btn-success" onclick="runFlow({{ flow.id }})">▶ Run</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteFlow({{ flow.id }})">Delete</button>
-                {% if flow.trigger_type == 'webhook' %}
-                <span class="mono webhook-url" title="POST to this URL">/webhooks/trigger/{{ flow.id }}</span>
-                {% endif %}
+                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                    <button class="btn btn-sm btn-primary" onclick="editFlow({{ flow.id }})">✏ Edit</button>
+                    <button class="btn btn-sm btn-success" onclick="runFlow({{ flow.id }})">▶ Run</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteFlow({{ flow.id }})">Delete</button>
+                    {% if flow.trigger_type == 'webhook' %}
+                    <span class="mono webhook-url" title="POST to this URL">/webhooks/trigger/{{ flow.id }}</span>
+                    {% endif %}
+                </div>
             </td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
+
+<!-- Mobile Card View -->
+<div class="flows-card-grid">
+    {% for flow in flows %}
+        <div class="flow-card">
+            <div class="flow-card-header">
+                <h3>{{ flow.name }}</h3>
+            </div>
+            <div class="flow-card-body">
+                <div class="flow-info-row">
+                    <span class="flow-label">Device:</span>
+                    <span class="flow-value">{{ device_map[flow.device_id].name if flow.device_id in device_map else '–' }}</span>
+                </div>
+                <div class="flow-info-row">
+                    <span class="flow-label">Trigger:</span>
+                    <span class="flow-badges"><span class="badge badge-trigger">{{ flow.trigger_type }}</span></span>
+                </div>
+                <div class="flow-info-row">
+                    <span class="flow-label">Action:</span>
+                    <span class="flow-badges"><span class="badge badge-action">{{ flow.action_type }}</span></span>
+                </div>
+                {% if flow.trigger_type == 'webhook' %}
+                <div class="flow-info-row">
+                    <span class="flow-label">Webhook:</span>
+                    <span class="mono webhook-url" title="POST to this URL">/webhooks/trigger/{{ flow.id }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="flow-card-actions">
+                <button class="btn btn-sm btn-primary" onclick="editFlow({{ flow.id }})">✏ Edit</button>
+                <button class="btn btn-sm btn-success" onclick="runFlow({{ flow.id }})">▶ Run</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFlow({{ flow.id }})">Delete</button>
+            </div>
+        </div>
+    {% endfor %}
+</div>
 {% else %}
 <div class="notice">No automation flows yet. Create one above.</div>
 {% endif %}
@@ -83,23 +165,428 @@
 
 {% block scripts %}
 <script>
+let steps = [];
+let nextStepId = 1;
+let cachedApps = [];
+
+const REMOTE_COMMAND_OPTIONS = [
+    'menu', 'top_menu', 'home', 'home_hold',
+    'up', 'down', 'left', 'right', 'select',
+    'play_pause', 'play', 'pause', 'stop', 'next', 'previous',
+    'volume_up', 'volume_down'
+];
+
+function getEditingFlowId() {
+    const raw = document.getElementById('editing-flow-id').value;
+    const id = parseInt(raw, 10);
+    return Number.isNaN(id) ? null : id;
+}
+
+function setEditingFlowId(idOrNull) {
+    const hidden = document.getElementById('editing-flow-id');
+    if (hidden) hidden.value = idOrNull == null ? '' : String(idOrNull);
+}
+
+function setEditMode(enabled) {
+    const saveBtn = document.getElementById('save-flow-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    if (saveBtn) saveBtn.textContent = enabled ? 'Update Flow' : 'Save Flow';
+    if (cancelBtn) cancelBtn.classList.toggle('hidden', !enabled);
+}
+
+function setBuilderStatus(message, isError = false) {
+    const box = document.getElementById('flow-builder-status');
+    if (!box) return;
+    if (!message) {
+        box.style.display = 'none';
+        box.textContent = '';
+        box.style.borderColor = '';
+        box.style.color = '';
+        return;
+    }
+    box.style.display = 'block';
+    box.textContent = (isError ? '❌ ' : '✅ ') + message;
+    if (isError) {
+        box.style.borderColor = 'var(--danger)';
+        box.style.color = 'var(--danger)';
+    } else {
+        box.style.borderColor = 'var(--success)';
+        box.style.color = 'var(--success)';
+    }
+}
+
+function stepTemplate(kind) {
+    switch (kind) {
+        case 'power_on':
+            return { id: nextStepId++, type: 'power', payload: { turn_on: true } };
+        case 'power_off':
+            return { id: nextStepId++, type: 'power', payload: { turn_on: false } };
+        case 'launch_app': {
+            const bundleId = cachedApps.length > 0 ? (cachedApps[0].bundle_id || '') : '';
+            return { id: nextStepId++, type: 'launch_app', payload: { bundle_id: bundleId } };
+        }
+        case 'remote_command':
+            return { id: nextStepId++, type: 'remote_command', payload: { command: 'menu' } };
+        case 'wait_seconds':
+            return { id: nextStepId++, type: 'wait_seconds', payload: { seconds: 1 } };
+        case 'swipe':
+            return { id: nextStepId++, type: 'swipe', payload: { direction: 'up' } };
+        default:
+            return null;
+    }
+}
+
+function addStep(kind) {
+    const step = stepTemplate(kind);
+    if (!step) return;
+    steps.push(step);
+    renderSteps();
+}
+
+function removeStep(stepId) {
+    steps = steps.filter(s => s.id !== stepId);
+    renderSteps();
+}
+
+function duplicateStep(stepId) {
+    const src = steps.find(s => s.id === stepId);
+    if (!src) return;
+    const copy = {
+        id: nextStepId++,
+        type: src.type,
+        payload: JSON.parse(JSON.stringify(src.payload || {})),
+    };
+    const idx = steps.findIndex(s => s.id === stepId);
+    steps.splice(idx + 1, 0, copy);
+    renderSteps();
+}
+
+function moveStep(fromIndex, toIndex) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    const [item] = steps.splice(fromIndex, 1);
+    steps.splice(toIndex, 0, item);
+    renderSteps();
+}
+
+function onPaletteDragStart(event) {
+    event.dataTransfer.setData('text/action-kind', event.currentTarget.dataset.actionKind);
+}
+
+function onStepDragStart(event) {
+    event.dataTransfer.setData('text/step-index', event.currentTarget.dataset.index);
+}
+
+function onStepDragOver(event) {
+    event.preventDefault();
+}
+
+function onStepDrop(event) {
+    event.preventDefault();
+    const from = parseInt(event.dataTransfer.getData('text/step-index'), 10);
+    const to = parseInt(event.currentTarget.dataset.index, 10);
+    if (!Number.isNaN(from) && !Number.isNaN(to)) {
+        moveStep(from, to);
+    }
+}
+
+function onDropzoneDragOver(event) {
+    event.preventDefault();
+}
+
+function onDropzoneDrop(event) {
+    event.preventDefault();
+    const kind = event.dataTransfer.getData('text/action-kind');
+    if (kind) {
+        addStep(kind);
+    }
+}
+
+function renderLaunchAppEditor(step, index) {
+    const options = cachedApps.map(a => {
+        const selected = a.bundle_id === step.payload.bundle_id ? 'selected' : '';
+        return `<option value="${escapeHtml(a.bundle_id || '')}" ${selected}>${escapeHtml(a.name || 'Unknown')} (${escapeHtml(a.bundle_id || '')})</option>`;
+    }).join('');
+
+    const hasApps = cachedApps.length > 0;
+    return `
+        <label>App
+            <select ${hasApps ? '' : 'disabled'} data-step-index="${index}" onchange="onLaunchAppSelected(event)">
+                ${hasApps ? options : '<option value="">No apps available from device</option>'}
+            </select>
+        </label>
+        <label>Bundle ID
+            <input type="text" value="${escapeHtml(step.payload.bundle_id || '')}" data-step-index="${index}" oninput="onLaunchBundleInput(event)" placeholder="com.netflix.Netflix" />
+        </label>
+    `;
+}
+
+function renderPowerEditor(step, index) {
+    const turnOn = !!step.payload.turn_on;
+    return `
+        <label>Power Action
+            <select data-step-index="${index}" onchange="onPowerSelect(event)">
+                <option value="on" ${turnOn ? 'selected' : ''}>Power On</option>
+                <option value="off" ${!turnOn ? 'selected' : ''}>Power Off</option>
+            </select>
+        </label>
+    `;
+}
+
+function renderRemoteEditor(step, index) {
+    const options = REMOTE_COMMAND_OPTIONS.map(cmd => {
+        const selected = cmd === step.payload.command ? 'selected' : '';
+        return `<option value="${cmd}" ${selected}>${cmd}</option>`;
+    }).join('');
+    return `
+        <label>Command
+            <select data-step-index="${index}" onchange="onRemoteCommandSelect(event)">
+                ${options}
+            </select>
+        </label>
+    `;
+}
+
+function renderWaitEditor(step, index) {
+    const seconds = Number(step.payload.seconds ?? 1);
+    return `
+        <label>Seconds
+            <input type="number" min="0" step="0.1" value="${Number.isFinite(seconds) ? seconds : 1}" data-step-index="${index}" oninput="onWaitSecondsInput(event)" />
+        </label>
+    `;
+}
+
+function renderSwipeEditor(step, index) {
+    const SWIPE_DIRECTIONS = ['up', 'down', 'left', 'right'];
+    const current = step.payload.direction || 'up';
+    const options = SWIPE_DIRECTIONS.map(d =>
+        `<option value="${d}" ${d === current ? 'selected' : ''}>${d.charAt(0).toUpperCase() + d.slice(1)}</option>`
+    ).join('');
+    return `
+        <label>Direction
+            <select data-step-index="${index}" onchange="onSwipeDirectionSelect(event)">
+                ${options}
+            </select>
+        </label>
+    `;
+}
+
+function renderSteps() {
+    const container = document.getElementById('flow-steps');
+    if (!container) return;
+
+    if (steps.length === 0) {
+        container.innerHTML = '<div class="notice">No steps yet. Drag an action from the palette to begin.</div>';
+        return;
+    }
+
+    container.innerHTML = steps.map((step, index) => {
+        let editor = '';
+        if (step.type === 'launch_app') editor = renderLaunchAppEditor(step, index);
+        if (step.type === 'power') editor = renderPowerEditor(step, index);
+        if (step.type === 'remote_command') editor = renderRemoteEditor(step, index);
+        if (step.type === 'wait_seconds') editor = renderWaitEditor(step, index);
+        if (step.type === 'swipe') editor = renderSwipeEditor(step, index);
+
+        return `
+            <div class="sequence-step" draggable="true" data-index="${index}" ondragstart="onStepDragStart(event)" ondragover="onStepDragOver(event)" ondrop="onStepDrop(event)">
+                <div class="sequence-step-header">
+                    <strong>Step ${index + 1}: ${escapeHtml(step.type)}</strong>
+                    <div class="controls-button-row">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="duplicateStep(${step.id})">Duplicate</button>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removeStep(${step.id})">Remove</button>
+                    </div>
+                </div>
+                <div class="form" style="margin-top:0.5rem;">
+                    ${editor}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function onPowerSelect(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    steps[idx].payload.turn_on = event.currentTarget.value === 'on';
+}
+
+function onRemoteCommandSelect(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    steps[idx].payload.command = event.currentTarget.value;
+}
+
+function onWaitSecondsInput(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    const value = parseFloat(event.currentTarget.value);
+    steps[idx].payload.seconds = Number.isNaN(value) ? 0 : Math.max(0, value);
+}
+
+function onSwipeDirectionSelect(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    steps[idx].payload.direction = event.currentTarget.value;
+}
+
+function onLaunchAppSelected(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    steps[idx].payload.bundle_id = event.currentTarget.value;
+    renderSteps();
+}
+
+function onLaunchBundleInput(event) {
+    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
+    if (Number.isNaN(idx) || !steps[idx]) return;
+    steps[idx].payload.bundle_id = event.currentTarget.value.trim();
+}
+
+async function loadAppsForDevice(showStatus = false) {
+    const deviceId = parseInt(document.getElementById('flow-device-id').value, 10);
+    if (Number.isNaN(deviceId)) return;
+    try {
+        const res = await fetch(`/apps/list/${deviceId}`);
+        const data = await res.json();
+        if (!res.ok) {
+            cachedApps = [];
+            renderSteps();
+            if (showStatus) {
+                setBuilderStatus(data.detail || 'Could not load apps from device', true);
+            }
+            return;
+        }
+
+        cachedApps = Array.isArray(data) ? data : [];
+        if (showStatus) {
+            setBuilderStatus(`Loaded ${cachedApps.length} app(s) for selected device.`, false);
+        }
+        renderSteps();
+    } catch (err) {
+        cachedApps = [];
+        renderSteps();
+        if (showStatus) {
+            setBuilderStatus(String(err), true);
+        }
+    }
+}
+
+async function onDeviceChanged() {
+    await loadAppsForDevice(true);
+}
+
+function resetBuilderForNewFlow() {
+    setEditingFlowId(null);
+    setEditMode(false);
+    steps = [];
+    renderSteps();
+}
+
+function cancelEditMode() {
+    resetBuilderForNewFlow();
+    setBuilderStatus('Edit canceled. Creating new flow.', false);
+}
+
+function flowToSteps(flow) {
+    let payload = {};
+    try {
+        payload = JSON.parse(flow.action_payload || '{}');
+    } catch {
+        payload = {};
+    }
+
+    if (flow.action_type === 'sequence' && Array.isArray(payload.actions)) {
+        return payload.actions
+            .filter(a => a && typeof a === 'object')
+            .map(a => ({
+                id: nextStepId++,
+                type: String(a.type || a.action_type || ''),
+                payload: (a.payload && typeof a.payload === 'object') ? a.payload : {},
+            }))
+            .filter(s => !!s.type);
+    }
+
+    // Backward compatibility: load legacy single-action flow as one visual step.
+    return [{
+        id: nextStepId++,
+        type: String(flow.action_type || 'remote_command'),
+        payload: payload && typeof payload === 'object' ? payload : {},
+    }];
+}
+
+async function editFlow(flowId) {
+    try {
+        const res = await fetch(`/automations/${flowId}`);
+        const flow = await res.json();
+        if (!res.ok) {
+            setBuilderStatus(flow.detail || 'Failed to load flow for editing.', true);
+            return;
+        }
+
+        document.getElementById('flow-name').value = flow.name || '';
+        document.getElementById('flow-device-id').value = String(flow.device_id);
+        document.getElementById('flow-trigger-type').value = flow.trigger_type || 'manual';
+
+        await loadAppsForDevice(false);
+
+        steps = flowToSteps(flow);
+        renderSteps();
+        setEditingFlowId(flowId);
+        setEditMode(true);
+        setBuilderStatus(`Editing flow: ${flow.name}`, false);
+
+        // Scroll to top so editor is visible immediately
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+        setBuilderStatus(String(err), true);
+    }
+}
+
 async function createFlow(e) {
     e.preventDefault();
-    const res = await fetch('/automations/', {
-        method: 'POST',
+
+    if (steps.length === 0) {
+        setBuilderStatus('Add at least one step to the sequence.', true);
+        return;
+    }
+
+    const sequencePayload = {
+        actions: steps.map(step => ({
+            type: step.type,
+            payload: step.payload,
+        }))
+    };
+
+    const editingId = getEditingFlowId();
+    const endpoint = editingId ? `/automations/${editingId}` : '/automations/';
+    const method = editingId ? 'PUT' : 'POST';
+
+    const res = await fetch(endpoint, {
+        method,
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
             name: document.getElementById('flow-name').value,
             device_id: parseInt(document.getElementById('flow-device-id').value),
             trigger_type: document.getElementById('flow-trigger-type').value,
-            trigger_payload: document.getElementById('flow-trigger-payload').value,
-            action_type: document.getElementById('flow-action-type').value,
-            action_payload: document.getElementById('flow-action-payload').value,
+            trigger_payload: '{}',
+            action_type: 'sequence',
+            action_payload: JSON.stringify(sequencePayload),
         })
     });
-    if (res.ok) location.reload();
-    else alert('Error: ' + await res.text());
+
+    if (res.ok) {
+        location.reload();
+    } else {
+        const data = await res.json().catch(() => ({}));
+        setBuilderStatus(data.detail || `Failed to ${editingId ? 'update' : 'create'} automation flow.`, true);
+    }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    setEditMode(false);
+    renderSteps();
+    loadAppsForDevice(false);
+});
 
 async function runFlow(id) {
     const res = await fetch(`/automations/${id}/run`, { method: 'POST' });
@@ -111,6 +598,15 @@ async function deleteFlow(id) {
     if (!confirm('Delete this flow?')) return;
     await fetch(`/automations/${id}`, { method: 'DELETE' });
     location.reload();
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
 }
 </script>
 {% endblock %}

@@ -62,8 +62,17 @@ alembic upgrade head
 ### 4. Start the server
 
 ```bash
+# Accessible on this PC only
 uvicorn home_automation_server.main:app --reload
+
+# Accessible from all devices on your LAN (recommended)
+uvicorn home_automation_server.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+| URL | Access |
+|-----|--------|
+| `http://127.0.0.1:8000` | This PC only |
+| `http://192.168.86.33:8000` | Any device on your home network |
 
 The API will be available at **http://127.0.0.1:8000**  
 Interactive docs at **http://127.0.0.1:8000/docs**  

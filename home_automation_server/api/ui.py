@@ -36,13 +36,19 @@ def ui_index(request: Request, session: SessionDep):
 @router.get("/devices", response_class=HTMLResponse, include_in_schema=False)
 def ui_devices(request: Request, session: SessionDep):
     devices = session.exec(select(AppleTVDevice)).all()
+    pairings = session.exec(select(AppleTVPairing)).all()
+    # Build device_id → list[protocol] so the template knows which protocols are paired
+    pairing_protocols: dict[int, list[str]] = {}
+    for p in pairings:
+        pairing_protocols.setdefault(p.device_id, []).append(p.protocol)
     return templates.TemplateResponse(
-        "devices.html", {"request": request, "devices": devices}
+        "devices.html",
+        {"request": request, "devices": devices, "pairing_protocols": pairing_protocols},
     )
 
 
 @router.get("/pairing", response_class=HTMLResponse, include_in_schema=False)
-def ui_pairing(request: Request, session: SessionDep):
+def ui_pairing(request: Request, session: SessionDep, device_id: int | None = None):
     devices = session.exec(select(AppleTVDevice)).all()
     pairings = session.exec(select(AppleTVPairing)).all()
     # Build a mapping device_id → list of pairings
@@ -51,7 +57,12 @@ def ui_pairing(request: Request, session: SessionDep):
         pairing_map.setdefault(p.device_id, []).append(p)
     return templates.TemplateResponse(
         "pairing.html",
-        {"request": request, "devices": devices, "pairing_map": pairing_map},
+        {
+            "request": request,
+            "devices": devices,
+            "pairing_map": pairing_map,
+            "preselect_device_id": device_id,
+        },
     )
 
 

@@ -15,9 +15,11 @@
     <h2>Pair a Device</h2>
     <form class="form" onsubmit="startPairing(event)">
         <label>Device
-            <select id="pair-device-id">
+            <select id="pair-device-id" onchange="updatePairingWarning()">
                 {% for device in devices %}
-                <option value="{{ device.id }}">{{ device.name }} ({{ device.ip_address }})</option>
+                <option value="{{ device.id }}" data-paired="{{ 'true' if device.id in pairing_map else 'false' }}">
+                    {{ device.name }} ({{ device.ip_address }})
+                </option>
                 {% endfor %}
             </select>
         </label>
@@ -28,6 +30,9 @@
                 <option value="AirPlay">AirPlay</option>
             </select>
         </label>
+        <div id="repair-warning" class="notice hidden" style="border-color:var(--warning);color:var(--warning);">
+            ⚠️ This device already has a pairing saved. Starting a new pairing will replace it.
+        </div>
         <button type="submit" class="btn btn-primary">Start Pairing</button>
     </form>
     <div id="pairing-status" class="notice hidden"></div>
@@ -43,26 +48,33 @@
 </div>
 
 <!-- Saved credentials -->
-<h2 style="margin-top:2rem;">Saved Credentials</h2>
+<h2 style="margin-top:2rem;">Saved Pairings</h2>
+{% set any_paired = namespace(found=false) %}
 {% for device in devices %}
     {% if device.id in pairing_map %}
-    <div class="credential-block">
-        <h3>{{ device.name }}</h3>
-        <table class="data-table">
-            <thead><tr><th>Protocol</th><th>Credentials (truncated)</th><th>Actions</th></tr></thead>
-            <tbody>
-            {% for p in pairing_map[device.id] %}
-            <tr>
-                <td><span class="badge">{{ p.protocol }}</span></td>
-                <td class="mono truncate">{{ p.credentials[:40] }}…</td>
-                <td><button class="btn btn-sm btn-danger" onclick="deletePairing({{ p.id }})">Delete</button></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        {% set any_paired.found = true %}
+        {% set p = pairing_map[device.id][0] %}
+        <div class="credential-block">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <h3>{{ device.name }}</h3>
+                <span class="badge badge-action">{{ p.protocol }}</span>
+            </div>
+            <table class="data-table" style="margin-top:0.5rem;">
+                <thead><tr><th>Protocol</th><th>Credentials (truncated)</th><th>Actions</th></tr></thead>
+                <tbody>
+                <tr>
+                    <td><span class="badge badge-action">{{ p.protocol }}</span></td>
+                    <td class="mono truncate">{{ p.credentials[:48] }}…</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="deletePairing({{ p.id }})">Remove</button></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
     {% endif %}
 {% endfor %}
+{% if not any_paired.found %}
+<div class="notice">No pairings saved yet.</div>
+{% endif %}
 {% endif %}
 {% endblock %}
 
@@ -70,6 +82,23 @@
 <script>
 let currentDeviceId = null;
 let currentProtocol = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    {% if preselect_device_id %}
+    const sel = document.getElementById('pair-device-id');
+    if (sel) sel.value = '{{ preselect_device_id }}';
+    {% endif %}
+    updatePairingWarning();
+});
+
+function updatePairingWarning() {
+    const sel = document.getElementById('pair-device-id');
+    const warning = document.getElementById('repair-warning');
+    if (!sel || !warning) return;
+    const opt = sel.options[sel.selectedIndex];
+    const isPaired = opt && opt.dataset.paired === 'true';
+    warning.classList.toggle('hidden', !isPaired);
+}
 
 async function startPairing(e) {
     e.preventDefault();

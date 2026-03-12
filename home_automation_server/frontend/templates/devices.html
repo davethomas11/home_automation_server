@@ -24,28 +24,83 @@
 <!-- Saved devices -->
 <h2>Saved Devices</h2>
 {% if devices %}
-<table class="data-table">
+<!-- Desktop Table View -->
+<table class="data-table data-table-desktop">
     <thead>
         <tr>
             <th>Name</th>
             <th>Identifier</th>
             <th>IP Address</th>
+            <th>Pairing</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
     {% for device in devices %}
+        {% set protocols = pairing_protocols.get(device.id, []) %}
         <tr>
             <td>{{ device.name }}</td>
-            <td class="mono">{{ device.identifier }}</td>
+            <td class="mono truncate">{{ device.identifier }}</td>
             <td class="mono">{{ device.ip_address }}</td>
             <td>
+                {% if protocols %}
+                    {% for proto in protocols %}
+                        <span class="badge badge-action">{{ proto }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="badge" style="border-color:#f87171;color:#f87171;">Not paired</span>
+                {% endif %}
+            </td>
+            <td style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                <a href="/ui/pairing?device_id={{ device.id }}" class="btn btn-sm btn-primary">
+                    {% if protocols %}🔑 Re-pair{% else %}🔗 Pair{% endif %}
+                </a>
                 <button class="btn btn-sm btn-danger" onclick="deleteDevice({{ device.id }})">Delete</button>
             </td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
+
+<!-- Mobile Card View -->
+<div class="devices-card-grid">
+    {% for device in devices %}
+        {% set protocols = pairing_protocols.get(device.id, []) %}
+        <div class="device-card">
+            <div class="device-card-header">
+                <h3>{{ device.name }}</h3>
+            </div>
+            <div class="device-card-body">
+                <div class="device-info-row">
+                    <span class="device-label">Identifier:</span>
+                    <span class="device-value mono">{{ device.identifier }}</span>
+                </div>
+                <div class="device-info-row">
+                    <span class="device-label">IP:</span>
+                    <span class="device-value mono">{{ device.ip_address }}</span>
+                </div>
+                <div class="device-info-row">
+                    <span class="device-label">Pairing:</span>
+                    <div class="device-badges">
+                        {% if protocols %}
+                            {% for proto in protocols %}
+                                <span class="badge badge-action">{{ proto }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="badge" style="border-color:#f87171;color:#f87171;">Not paired</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="device-card-actions">
+                <a href="/ui/pairing?device_id={{ device.id }}" class="btn btn-sm btn-primary">
+                    {% if protocols %}🔑 Re-pair{% else %}🔗 Pair{% endif %}
+                </a>
+                <button class="btn btn-sm btn-danger" onclick="deleteDevice({{ device.id }})">Delete</button>
+            </div>
+        </div>
+    {% endfor %}
+</div>
 {% else %}
 <div class="notice">No devices saved. Use the Scan button to discover Apple TVs on your network.</div>
 {% endif %}

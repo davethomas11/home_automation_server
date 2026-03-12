@@ -1,5 +1,5 @@
 /* =========================================================
-   Vectrune – Main Stylesheet
+   Home Automation Server – Main Stylesheet
    ========================================================= */
 
 :root {
@@ -234,6 +234,126 @@ nav a:hover { color: var(--accent-hover); }
 
 .data-table tr:hover td { background: var(--surface2); }
 
+/* ── Device cards (mobile layout) ── */
+.device-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.device-card-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.device-card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.device-card-body {
+    margin-bottom: 0.75rem;
+}
+
+.device-info-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: flex-start;
+}
+
+.device-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.device-value {
+    font-size: 0.85rem;
+    color: var(--text);
+    word-break: break-all;
+    flex: 1;
+}
+
+.device-badges {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.device-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* ── Flow cards (mobile layout) ── */
+.flow-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.flow-card-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.flow-card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.flow-card-body {
+    margin-bottom: 0.75rem;
+}
+
+.flow-info-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: flex-start;
+}
+
+.flow-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.flow-value {
+    font-size: 0.85rem;
+    color: var(--text);
+    flex: 1;
+}
+
+.flow-badges {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.flow-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* Device cards for mobile */
+.devices-card-grid { display: none; }
+.flows-card-grid { display: none; }
+.data-table-desktop { display: table; }
+
 /* ── Badges ── */
 .badge {
     display: inline-block;
@@ -327,12 +447,282 @@ nav a:hover { color: var(--accent-hover); }
     padding: 0.15rem 0.45rem;
 }
 
+/* ── Controls page ── */
+.controls-error-banner {
+    position: fixed;
+    top: 78px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(920px, calc(100vw - 2rem));
+    z-index: 1200;
+    border-color: var(--danger);
+    color: var(--danger);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.controls-direction-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(70px, 90px));
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: start;
+}
+
+.controls-button-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.controls-power-state-row {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.controls-apps-header {
+    margin-bottom: 1rem;
+}
+
+.controls-apps-results {
+    margin-top: 1rem;
+}
+
+/* ── Automation builder ── */
+.automation-builder {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.automation-palette,
+.automation-sequence {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem;
+}
+
+.automation-palette h3,
+.automation-sequence h3 {
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+.palette-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.6rem;
+    margin-bottom: 0.5rem;
+    background: var(--surface);
+    cursor: grab;
+}
+
+.palette-item:active {
+    cursor: grabbing;
+}
+
+.sequence-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem;
+    margin-bottom: 0.6rem;
+}
+
+.sequence-step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* ── Responsive ── */
+
+/* Tablet (640px - 1023px) */
+@media (max-width: 1023px) {
+    html { font-size: 15px; }
+    .container { padding: 0 1.5rem; margin: 1.5rem auto; }
+    .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .automation-builder { grid-template-columns: 1fr; gap: 1.5rem; }
+    .automation-palette { margin-bottom: 0.5rem; }
+}
+
+/* Mobile (max 640px) */
 @media (max-width: 640px) {
-    .header-inner { flex-direction: column; height: auto; padding: 0.75rem 0; gap: 0.5rem; }
-    nav { gap: 0.85rem; flex-wrap: wrap; justify-content: center; }
+    html { font-size: 14px; }
+
+    /* Header adjustments */
+    .site-header { padding: 0 1rem; }
+    .header-inner {
+        flex-direction: column;
+        height: auto;
+        padding: 0.75rem 0;
+        gap: 0.5rem;
+    }
+    .logo { font-size: 1.1rem; }
+
+    /* Navigation */
+    nav {
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    nav a { font-size: 0.8rem; }
+
+    /* Container & spacing */
     .container { padding: 0 1rem; margin: 1rem auto; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
-    .card-grid { grid-template-columns: 1fr 1fr; }
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .page-header h1 { font-size: 1.5rem; }
+
+    /* Hero */
+    .hero h1 { font-size: 1.8rem; }
+    .subtitle { font-size: 0.95rem; }
+
+    /* Card grid */
+    .card-grid { grid-template-columns: 1fr; }
+    .card { padding: 1.25rem; }
+    .card-icon { font-size: 1.75rem; }
+    .card h2 { font-size: 1rem; }
+
+    /* Forms & inputs (touch-friendly) */
+    .form label { font-size: 0.8rem; }
+    .form input,
+    .form select,
+    .form textarea {
+        font-size: 1rem; /* Prevent zoom on iOS */
+        padding: 0.7rem;
+        min-height: 44px; /* Touch target minimum */
+    }
+
+    /* Tables – horizontal scroll on mobile */
+    .data-table {
+        font-size: 0.8rem;
+        display: none;
+    }
+    .data-table-desktop {
+        display: none !important;
+    }
+    .devices-card-grid {
+        display: block;
+    }
+    .flows-card-grid {
+        display: block;
+    }
+
+    /* Buttons – touch-friendly sizing */
+    .btn {
+        font-size: 0.85rem;
+        padding: 0.65rem 1rem;
+        min-height: 44px;
+        min-width: 44px;
+    }
+    .btn-sm { padding: 0.4rem 0.6rem; min-height: 36px; }
+
+    /* Controls */
+    .controls-direction-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+    }
+    .controls-button-row {
+        gap: 0.4rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .controls-button-row .btn { width: 100%; }
+    .controls-power-state-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.4rem;
+    }
+    .controls-error-banner {
+        width: calc(100vw - 1rem);
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    /* Automation builder */
+    .automation-builder {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .automation-palette,
+    .automation-sequence {
+        padding: 0.75rem;
+    }
+    .palette-item {
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .palette-item span,
+    .palette-item button {
+        width: 100%;
+        text-align: center;
+    }
+    .sequence-step {
+        padding: 0.6rem;
+    }
+    .sequence-step-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+    .sequence-step-header strong { word-break: break-word; }
+
+    /* Collapsible */
+    .collapsible summary {
+        padding: 0.85rem 1rem;
+        font-size: 0.95rem;
+    }
+    .collapsible .form,
+    .collapsible > form {
+        padding: 0 1rem 1rem;
+    }
+
+    /* Badges */
+    .badge { font-size: 0.7rem; padding: 0.15rem 0.4rem; }
+
+    /* Utilities */
+    .truncate { max-width: 100%; }
+    .mono { font-size: 0.75rem; }
+    .webhook-url {
+        font-size: 0.7rem;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        display: inline-block;
+        word-break: break-all;
+        max-height: 2.5rem;
+        padding: 0.25rem 0.4rem;
+        overflow-y: hidden;
+    }
+
+    /* Footer */
+    .site-footer { padding: 1rem; font-size: 0.75rem; }
+}
+
+/* Ultra-mobile (max 380px) */
+@media (max-width: 380px) {
+    html { font-size: 13px; }
+    .page-header h1 { font-size: 1.3rem; }
+    .hero h1 { font-size: 1.5rem; }
+    .btn, .btn-sm { padding: 0.6rem 0.8rem; }
+    .controls-direction-grid { grid-template-columns: repeat(2, 1fr); }
 }
 

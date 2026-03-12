@@ -59,7 +59,10 @@ async def start_pairing(body: StartPairingRequest, session: SessionDep):
 
 @router.post("/finish", response_model=AppleTVPairingRead, summary="Finish pairing and save credentials")
 async def finish_pairing(body: FinishPairingRequest, session: SessionDep):
-    """Submits the PIN, finalises pairing, and stores credentials in the database."""
+    """
+    Submits the PIN, finalises pairing, and stores credentials in the database.
+    Any existing pairing for this device (regardless of protocol) is replaced.
+    """
     device = session.get(AppleTVDevice, body.device_id)
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
@@ -70,19 +73,13 @@ async def finish_pairing(body: FinishPairingRequest, session: SessionDep):
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
-    # Upsert: replace existing credentials for same device/protocol
-    existing = session.exec(
-        select(AppleTVPairing)
-        .where(AppleTVPairing.device_id == body.device_id)
-        .where(AppleTVPairing.protocol == body.protocol)
-    ).first()
-
-    if existing:
-        existing.credentials = credentials
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        return existing
+    # Delete ALL existing pairings for this device – one pairing per device enforced
+    existing_pairings = session.exec(
+        select(AppleTVPairing).where(AppleTVPairing.device_id == body.device_id)
+    ).all()
+    for old in existing_pairings:
+        session.delete(old)
+    session.flush()
 
     pairing = AppleTVPairing(
         device_id=body.device_id,

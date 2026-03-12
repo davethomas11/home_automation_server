@@ -103,7 +103,10 @@ async def list_installed_apps(device_id: int, session: SessionDep):
     try:
         apps = await pyatv_service.list_apps(device.identifier, device.ip_address, credentials)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+        message = str(exc)
+        if "not supported" in message.lower():
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=message)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=message)
 
     return apps
 

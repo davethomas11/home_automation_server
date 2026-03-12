@@ -6,6 +6,11 @@
     <h1>Device Controls</h1>
 </div>
 
+<div id="controls-error-banner" class="notice hidden controls-error-banner">
+    <span id="controls-error-banner-text"></span>
+    <button type="button" class="btn btn-sm btn-secondary" onclick="clearErrorBanner()" aria-label="Dismiss error">✕</button>
+</div>
+
 {% if not devices %}
 <div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
 {% else %}
@@ -25,7 +30,7 @@
 
 <div class="card-form">
     <h2>Directional</h2>
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(70px, 90px));gap:0.5rem;align-items:center;justify-content:start;">
+    <div class="controls-direction-grid">
         <div></div>
         <button class="btn btn-secondary" onclick="sendCmd('up')">⬆ Up</button>
         <div></div>
@@ -41,8 +46,32 @@
 </div>
 
 <div class="card-form">
+    <h2>Navigation</h2>
+    <div class="controls-button-row">
+        <button class="btn btn-secondary" onclick="sendCmd('menu')">☰ Menu</button>
+        <button class="btn btn-secondary" onclick="sendCmd('top_menu')">⌂ Top Menu</button>
+        <button class="btn btn-secondary" onclick="sendCmd('home')">📺 TV / Home</button>
+        <button class="btn btn-secondary" onclick="sendCmd('home_hold')">⏏ Home Hold</button>
+    </div>
+</div>
+
+<div class="card-form">
+    <h2>Playback</h2>
+    <div class="controls-button-row">
+        <button class="btn btn-secondary" onclick="sendCmd('skip_backward')">⏪ Skip Back</button>
+        <button class="btn btn-secondary" onclick="sendCmd('previous')">⏮ Previous</button>
+        <button class="btn btn-secondary" onclick="sendCmd('play')">▶ Play</button>
+        <button class="btn btn-primary"   onclick="sendCmd('play_pause')">⏯ Play / Pause</button>
+        <button class="btn btn-secondary" onclick="sendCmd('pause')">⏸ Pause</button>
+        <button class="btn btn-secondary" onclick="sendCmd('stop')">⏹ Stop</button>
+        <button class="btn btn-secondary" onclick="sendCmd('next')">⏭ Next</button>
+        <button class="btn btn-secondary" onclick="sendCmd('skip_forward')">⏩ Skip Fwd</button>
+    </div>
+</div>
+
+<div class="card-form">
     <h2>Volume</h2>
-    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+    <div class="controls-button-row">
         <button class="btn btn-secondary" onclick="sendCmd('volume_down')">🔉 Volume -</button>
         <button class="btn btn-secondary" onclick="sendCmd('volume_up')">🔊 Volume +</button>
     </div>
@@ -50,10 +79,32 @@
 
 <div class="card-form">
     <h2>Power</h2>
-    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+    <div class="controls-button-row">
         <button class="btn btn-success" onclick="sendPower(true)">Power On</button>
         <button class="btn btn-danger" onclick="sendPower(false)">Power Off</button>
+        <button class="btn btn-secondary" onclick="refreshPowerState()">🔄 Refresh State</button>
     </div>
+    <div class="controls-power-state-row">
+        <span>Current state:</span>
+        <span id="power-state-badge" class="badge">Unknown</span>
+    </div>
+</div>
+
+<div class="card-form">
+    <div class="page-header controls-apps-header">
+        <h2>Installed Apps</h2>
+        <button class="btn btn-secondary" onclick="fetchApps()">📋 List Apps</button>
+    </div>
+
+    <form class="form" onsubmit="launchBundleId(event)">
+        <label>Launch by Bundle ID
+            <input type="text" id="manual-bundle-id" placeholder="com.netflix.Netflix" />
+        </label>
+        <button type="submit" class="btn btn-primary">🚀 Launch Bundle ID</button>
+    </form>
+
+    <div id="apps-status" class="notice hidden"></div>
+    <div id="apps-results" class="hidden controls-apps-results"></div>
 </div>
 {% endif %}
 {% endblock %}
@@ -64,14 +115,135 @@ function selectedDeviceId() {
     return parseInt(document.getElementById('control-device-id').value, 10);
 }
 
+let errorBannerTimer = null;
+
+function clearErrorBanner() {
+    const banner = document.getElementById('controls-error-banner');
+    const text = document.getElementById('controls-error-banner-text');
+    if (!banner) return;
+    if (errorBannerTimer) {
+        clearTimeout(errorBannerTimer);
+        errorBannerTimer = null;
+    }
+    banner.classList.add('hidden');
+    if (text) {
+        text.textContent = '';
+    }
+}
+
+function showErrorBanner(message) {
+    const banner = document.getElementById('controls-error-banner');
+    const text = document.getElementById('controls-error-banner-text');
+    if (!banner) return;
+    if (errorBannerTimer) {
+        clearTimeout(errorBannerTimer);
+        errorBannerTimer = null;
+    }
+    banner.classList.remove('hidden');
+    if (text) {
+        text.textContent = '❌ ' + (message || 'Unexpected error');
+    }
+    errorBannerTimer = setTimeout(() => {
+        clearErrorBanner();
+    }, 6000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const selector = document.getElementById('control-device-id');
+    if (selector) {
+        selector.addEventListener('change', () => {
+            clearAppsResults();
+            refreshPowerState();
+        });
+    }
+    clearErrorBanner();
+    refreshPowerState();
+});
+
 function setStatus(message, ok = true) {
     const box = document.getElementById('control-status');
     box.classList.remove('hidden');
     box.textContent = (ok ? '✅ ' : '❌ ') + message;
 }
 
+function setAppsStatus(message, ok = true) {
+    const box = document.getElementById('apps-status');
+    box.classList.remove('hidden');
+    box.textContent = (ok ? '✅ ' : '❌ ') + message;
+}
+
+function clearAppsResults() {
+    const results = document.getElementById('apps-results');
+    const status = document.getElementById('apps-status');
+    if (results) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+    }
+    if (status) {
+        status.classList.add('hidden');
+        status.textContent = '';
+    }
+}
+
+function setPowerStateBadge(state, ok = true) {
+    const badge = document.getElementById('power-state-badge');
+    if (!badge) return;
+
+    const normalized = String(state || 'unknown').toLowerCase();
+    badge.textContent = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+
+    // Reset inline styles so state transitions don't stack
+    badge.style.borderColor = '';
+    badge.style.color = '';
+
+    if (!ok) {
+        badge.textContent = 'Unavailable';
+        badge.style.borderColor = '#f87171';
+        badge.style.color = '#f87171';
+        return;
+    }
+
+    if (normalized === 'on') {
+        badge.style.borderColor = '#34d399';
+        badge.style.color = '#34d399';
+    } else if (normalized === 'off') {
+        badge.style.borderColor = '#f87171';
+        badge.style.color = '#f87171';
+    } else {
+        badge.style.borderColor = '#fbbf24';
+        badge.style.color = '#fbbf24';
+    }
+}
+
+async function refreshPowerState() {
+    try {
+        clearErrorBanner();
+        const res = await fetch(`/controls/power-state/${selectedDeviceId()}`);
+        const data = await res.json();
+        if (!res.ok) {
+            setPowerStateBadge('unknown', false);
+            if (res.status !== 501) {
+                const msg = data.detail || 'Failed to get power state';
+                setStatus(msg, false);
+                showErrorBanner(msg);
+            } else {
+                const msg = data.detail || 'Power state not supported on this device';
+                setStatus(msg, false);
+            }
+            return;
+        }
+        setPowerStateBadge(data.power_state, true);
+    } catch (err) {
+        setPowerStateBadge('unknown', false);
+        const msg = String(err);
+        setStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
 async function sendCmd(command) {
     try {
+        clearErrorBanner();
         const res = await fetch('/controls/command', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -79,17 +251,22 @@ async function sendCmd(command) {
         });
         const data = await res.json();
         if (!res.ok) {
-            setStatus(data.detail || 'Failed to send command', false);
+            const msg = data.detail || 'Failed to send command';
+            setStatus(msg, false);
+            showErrorBanner(msg);
             return;
         }
         setStatus(`Sent command: ${command}`);
     } catch (err) {
-        setStatus(String(err), false);
+        const msg = String(err);
+        setStatus(msg, false);
+        showErrorBanner(msg);
     }
 }
 
 async function sendPower(turnOn) {
     try {
+        clearErrorBanner();
         const res = await fetch('/controls/power', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -97,13 +274,133 @@ async function sendPower(turnOn) {
         });
         const data = await res.json();
         if (!res.ok) {
-            setStatus(data.detail || 'Failed to change power state', false);
+            const msg = data.detail || 'Failed to change power state';
+            setStatus(msg, false);
+            showErrorBanner(msg);
             return;
         }
         setStatus(`Power ${turnOn ? 'on' : 'off'} command sent`);
+        setTimeout(refreshPowerState, 1200);
     } catch (err) {
-        setStatus(String(err), false);
+        const msg = String(err);
+        setStatus(msg, false);
+        showErrorBanner(msg);
     }
+}
+
+async function fetchApps() {
+    const results = document.getElementById('apps-results');
+    results.classList.remove('hidden');
+    results.innerHTML = '⏳ Loading installed apps…';
+
+    try {
+        clearErrorBanner();
+        const res = await fetch(`/apps/list/${selectedDeviceId()}`);
+        const data = await res.json();
+        if (!res.ok) {
+            results.innerHTML = '';
+            if (res.status === 501) {
+                results.classList.remove('hidden');
+                results.innerHTML = `
+                    <div class="notice">
+                        This device does not support installed app listing via pyatv.<br/>
+                        You can still launch an app manually using a bundle ID above.
+                    </div>
+                `;
+            }
+            const msg = data.detail || 'Failed to list apps';
+            setAppsStatus(msg, false);
+            if (res.status !== 501) {
+                showErrorBanner(msg);
+            }
+            return;
+        }
+
+        if (data.length === 0) {
+            results.innerHTML = '<div class="notice">No apps returned by the device.</div>';
+            setAppsStatus('App list loaded');
+            return;
+        }
+
+        results.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>App Name</th>
+                        <th>Bundle ID</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(app => `
+                        <tr>
+                            <td>${escapeHtml(app.name || 'Unknown')}</td>
+                            <td class="mono">${escapeHtml(app.bundle_id || '')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="launchApp('${escapeJs(app.bundle_id || '')}')">Launch</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        setAppsStatus(`Loaded ${data.length} app(s)`);
+    } catch (err) {
+        results.innerHTML = '';
+        const msg = String(err);
+        setAppsStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+async function launchApp(bundleId) {
+    try {
+        clearErrorBanner();
+        const res = await fetch('/apps/launch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: selectedDeviceId(), bundle_id: bundleId })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = data.detail || 'Failed to launch app';
+            setAppsStatus(msg, false);
+            showErrorBanner(msg);
+            return;
+        }
+        setAppsStatus(`Launched ${bundleId}`);
+    } catch (err) {
+        const msg = String(err);
+        setAppsStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+async function launchBundleId(event) {
+    event.preventDefault();
+    const bundleId = document.getElementById('manual-bundle-id').value.trim();
+    if (!bundleId) {
+        const msg = 'Enter a bundle ID first';
+        setAppsStatus(msg, false);
+        showErrorBanner(msg);
+        return;
+    }
+    await launchApp(bundleId);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function escapeJs(value) {
+    return String(value)
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "\\'");
 }
 </script>
 {% endblock %}

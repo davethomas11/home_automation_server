@@ -111,13 +111,18 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Setup complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "To start the server:" -ForegroundColor Cyan
+Write-Host "To start the server (accessible on your LAN):" -ForegroundColor Cyan
 Write-Host "  .venv\Scripts\Activate.ps1"
-Write-Host "  uvicorn home_automation_server.main:app --reload"
+Write-Host "  uvicorn home_automation_server.main:app --host 0.0.0.0 --port 8000 --reload"
 Write-Host ""
-Write-Host "Then open:" -ForegroundColor Cyan
-Write-Host "  http://127.0.0.1:8000       -> Dashboard UI"
-Write-Host "  http://127.0.0.1:8000/docs  -> Swagger API docs"
+Write-Host "Then open from this PC:" -ForegroundColor Cyan
+Write-Host "  http://127.0.0.1:8000"
+Write-Host ""
+Write-Host "Or from any device on your network:" -ForegroundColor Cyan
+Write-Host "  http://192.168.86.33:8000"
+Write-Host ""
+Write-Host "Then open API docs:" -ForegroundColor Cyan
+Write-Host "  http://192.168.86.33:8000/docs"
 Write-Host ""
 
 

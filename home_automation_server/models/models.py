@@ -70,7 +70,7 @@ class AutomationFlowBase(SQLModel):
     name: str
     trigger_type: str  # "webhook" | "schedule" | "manual"
     trigger_payload: str = "{}"  # JSON string
-    action_type: str  # "launch_app" | "remote_command" | "power"
+    action_type: str  # "launch_app" | "remote_command" | "power" | "swipe" | "sequence"
     action_payload: str = "{}"  # JSON string
 
 
