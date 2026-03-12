@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Home Automation Server{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Home Automation Dashboard</h1>
+    <p class="subtitle">Control your Apple TVs from one place.</p>
+</section>
+
+<div class="card-grid">
+    <a class="card" href="/ui/devices">
+        <span class="card-icon">📺</span>
+        <h2>Devices</h2>
+        <p>{{ devices | length }} saved device{{ 's' if devices | length != 1 else '' }}</p>
+    </a>
+    <a class="card" href="/ui/pairing">
+        <span class="card-icon">🔗</span>
+        <h2>Pairing</h2>
+        <p>Manage credentials</p>
+    </a>
+    <a class="card" href="/ui/automations">
+        <span class="card-icon">⚡</span>
+        <h2>Automations</h2>
+        <p>Configure flows &amp; triggers</p>
+    </a>
+    <a class="card" href="/ui/apps">
+        <span class="card-icon">📦</span>
+        <h2>Apps</h2>
+        <p>Launch apps by bundle ID</p>
+    </a>
+</div>
+
+{% if not devices %}
+<div class="notice">
+    <strong>No devices saved yet.</strong>
+    Go to <a href="/ui/devices">Devices</a> to scan your network and add an Apple TV.
+</div>
+{% endif %}
+{% endblock %}
+

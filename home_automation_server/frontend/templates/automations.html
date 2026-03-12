@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Automations · Home Automation Server{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Automation Flows</h1>
+</div>
+
+{% if not devices %}
+<div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
+{% else %}
+
+<!-- Create flow form -->
+<details class="collapsible" open>
+    <summary>➕ Create New Flow</summary>
+    <form class="form" onsubmit="createFlow(event)">
+        <label>Name <input type="text" id="flow-name" required placeholder="Open Netflix on startup" /></label>
+        <label>Device
+            <select id="flow-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Trigger Type
+            <select id="flow-trigger-type">
+                <option value="webhook">Webhook</option>
+                <option value="manual">Manual</option>
+                <option value="schedule">Schedule</option>
+            </select>
+        </label>
+        <label>Trigger Payload (JSON) <input type="text" id="flow-trigger-payload" value="{}" /></label>
+        <label>Action Type
+            <select id="flow-action-type">
+                <option value="launch_app">Launch App</option>
+                <option value="remote_command">Remote Command</option>
+                <option value="power">Power</option>
+            </select>
+        </label>
+        <label>Action Payload (JSON)
+            <input type="text" id="flow-action-payload" value='{"bundle_id":"com.netflix.Netflix"}' />
+        </label>
+        <button type="submit" class="btn btn-primary">Save Flow</button>
+    </form>
+</details>
+
+<!-- Flow list -->
+<h2 style="margin-top:2rem;">Saved Flows</h2>
+{% if flows %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Device</th>
+            <th>Trigger</th>
+            <th>Action</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for flow in flows %}
+        <tr>
+            <td>{{ flow.name }}</td>
+            <td>{{ device_map[flow.device_id].name if flow.device_id in device_map else '–' }}</td>
+            <td><span class="badge badge-trigger">{{ flow.trigger_type }}</span></td>
+            <td><span class="badge badge-action">{{ flow.action_type }}</span></td>
+            <td>
+                <button class="btn btn-sm btn-success" onclick="runFlow({{ flow.id }})">▶ Run</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFlow({{ flow.id }})">Delete</button>
+                {% if flow.trigger_type == 'webhook' %}
+                <span class="mono webhook-url" title="POST to this URL">/webhooks/trigger/{{ flow.id }}</span>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="notice">No automation flows yet. Create one above.</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function createFlow(e) {
+    e.preventDefault();
+    const res = await fetch('/automations/', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('flow-name').value,
+            device_id: parseInt(document.getElementById('flow-device-id').value),
+            trigger_type: document.getElementById('flow-trigger-type').value,
+            trigger_payload: document.getElementById('flow-trigger-payload').value,
+            action_type: document.getElementById('flow-action-type').value,
+            action_payload: document.getElementById('flow-action-payload').value,
+        })
+    });
+    if (res.ok) location.reload();
+    else alert('Error: ' + await res.text());
+}
+
+async function runFlow(id) {
+    const res = await fetch(`/automations/${id}/run`, { method: 'POST' });
+    const data = await res.json();
+    alert(res.ok ? '✅ Flow triggered: ' + JSON.stringify(data.action || data) : '❌ ' + (data.detail || 'Error'));
+}
+
+async function deleteFlow(id) {
+    if (!confirm('Delete this flow?')) return;
+    await fetch(`/automations/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+</script>
+{% endblock %}
+

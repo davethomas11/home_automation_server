@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Controls · Home Automation Server{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Device Controls</h1>
+</div>
+
+{% if not devices %}
+<div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
+{% else %}
+<div class="card-form">
+    <h2>Target Device</h2>
+    <form class="form" onsubmit="return false;">
+        <label>Device
+            <select id="control-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }} ({{ device.ip_address }})</option>
+                {% endfor %}
+            </select>
+        </label>
+    </form>
+    <div id="control-status" class="notice hidden"></div>
+</div>
+
+<div class="card-form">
+    <h2>Directional</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(70px, 90px));gap:0.5rem;align-items:center;justify-content:start;">
+        <div></div>
+        <button class="btn btn-secondary" onclick="sendCmd('up')">⬆ Up</button>
+        <div></div>
+
+        <button class="btn btn-secondary" onclick="sendCmd('left')">⬅ Left</button>
+        <button class="btn btn-primary" onclick="sendCmd('select')">Select</button>
+        <button class="btn btn-secondary" onclick="sendCmd('right')">Right ➡</button>
+
+        <div></div>
+        <button class="btn btn-secondary" onclick="sendCmd('down')">⬇ Down</button>
+        <div></div>
+    </div>
+</div>
+
+<div class="card-form">
+    <h2>Volume</h2>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="sendCmd('volume_down')">🔉 Volume -</button>
+        <button class="btn btn-secondary" onclick="sendCmd('volume_up')">🔊 Volume +</button>
+    </div>
+</div>
+
+<div class="card-form">
+    <h2>Power</h2>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="sendPower(true)">Power On</button>
+        <button class="btn btn-danger" onclick="sendPower(false)">Power Off</button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function selectedDeviceId() {
+    return parseInt(document.getElementById('control-device-id').value, 10);
+}
+
+function setStatus(message, ok = true) {
+    const box = document.getElementById('control-status');
+    box.classList.remove('hidden');
+    box.textContent = (ok ? '✅ ' : '❌ ') + message;
+}
+
+async function sendCmd(command) {
+    try {
+        const res = await fetch('/controls/command', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: selectedDeviceId(), command })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setStatus(data.detail || 'Failed to send command', false);
+            return;
+        }
+        setStatus(`Sent command: ${command}`);
+    } catch (err) {
+        setStatus(String(err), false);
+    }
+}
+
+async function sendPower(turnOn) {
+    try {
+        const res = await fetch('/controls/power', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: selectedDeviceId(), turn_on: turnOn })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            setStatus(data.detail || 'Failed to change power state', false);
+            return;
+        }
+        setStatus(`Power ${turnOn ? 'on' : 'off'} command sent`);
+    } catch (err) {
+        setStatus(String(err), false);
+    }
+}
+</script>
+{% endblock %}
+

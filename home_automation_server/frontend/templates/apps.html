@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Apps · Home Automation Server{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>App Launcher</h1>
+</div>
+
+{% if not devices %}
+<div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
+{% else %}
+
+<!-- Quick launch -->
+<div class="card-form">
+    <h2>Quick Launch</h2>
+    <form class="form" onsubmit="launchApp(event)">
+        <label>Device
+            <select id="launch-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Bundle ID
+            <input type="text" id="launch-bundle-id" required placeholder="com.netflix.Netflix" />
+        </label>
+        <button type="submit" class="btn btn-primary">🚀 Launch</button>
+    </form>
+    <div id="launch-status" class="notice hidden"></div>
+</div>
+
+<!-- Fetch app list -->
+<div class="card-form" style="margin-top:1.5rem;">
+    <h2>Fetch Installed Apps</h2>
+    <form class="form" onsubmit="fetchApps(event)">
+        <label>Device
+            <select id="fetch-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="btn btn-secondary">📋 Fetch App List</button>
+    </form>
+    <div id="app-list-results" class="hidden" style="margin-top:1rem;"></div>
+</div>
+
+<!-- Saved app configs -->
+<h2 style="margin-top:2rem;">Saved App Configs</h2>
+<details class="collapsible">
+    <summary>➕ Save a new app config</summary>
+    <form class="form" onsubmit="saveConfig(event)">
+        <label>Device
+            <select id="config-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>App Name <input type="text" id="config-app-name" required placeholder="Netflix" /></label>
+        <label>Bundle ID <input type="text" id="config-bundle-id" required placeholder="com.netflix.Netflix" /></label>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+</details>
+
+{% if configs %}
+<table class="data-table" style="margin-top:1rem;">
+    <thead>
+        <tr><th>App Name</th><th>Bundle ID</th><th>Device</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {% for cfg in configs %}
+        <tr>
+            <td>{{ cfg.app_name }}</td>
+            <td class="mono">{{ cfg.bundle_id }}</td>
+            <td>{{ device_map[cfg.device_id].name if cfg.device_id in device_map else '–' }}</td>
+            <td>
+                <button class="btn btn-sm btn-success"
+                    onclick="quickLaunchConfig({{ cfg.device_id }}, '{{ cfg.bundle_id }}')">▶ Launch</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteConfig({{ cfg.id }})">Delete</button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="notice">No saved app configs yet.</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function launchApp(e) {
+    e.preventDefault();
+    await doLaunch(
+        parseInt(document.getElementById('launch-device-id').value),
+        document.getElementById('launch-bundle-id').value
+    );
+}
+
+async function quickLaunchConfig(deviceId, bundleId) {
+    await doLaunch(deviceId, bundleId);
+}
+
+async function doLaunch(deviceId, bundleId) {
+    const status = document.getElementById('launch-status');
+    status.classList.remove('hidden');
+    status.textContent = '⏳ Launching…';
+    try {
+        const res = await fetch('/apps/launch', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ device_id: deviceId, bundle_id: bundleId })
+        });
+        const data = await res.json();
+        status.textContent = res.ok ? '✅ Launched ' + data.bundle_id : '❌ ' + (data.detail || 'Error');
+    } catch(err) {
+        status.textContent = '❌ ' + err;
+    }
+}
+
+async function fetchApps(e) {
+    e.preventDefault();
+    const deviceId = document.getElementById('fetch-device-id').value;
+    const results = document.getElementById('app-list-results');
+    results.classList.remove('hidden');
+    results.innerHTML = '⏳ Fetching…';
+    try {
+        const res = await fetch(`/apps/list/${deviceId}`);
+        const data = await res.json();
+        if (!res.ok) { results.innerHTML = '❌ ' + (data.detail || 'Error'); return; }
+        if (data.length === 0) { results.innerHTML = '<p class="notice">No apps found.</p>'; return; }
+        results.innerHTML = '<table class="data-table"><thead><tr><th>Name</th><th>Bundle ID</th><th></th></tr></thead><tbody>'
+            + data.map(a => `<tr><td>${a.name}</td><td class="mono">${a.bundle_id}</td>
+                <td><button class="btn btn-sm btn-success" onclick="doLaunch(${deviceId},'${a.bundle_id}')">▶</button></td></tr>`).join('')
+            + '</tbody></table>';
+    } catch(err) {
+        results.innerHTML = '❌ ' + err;
+    }
+}
+
+async function saveConfig(e) {
+    e.preventDefault();
+    const res = await fetch('/apps/configs', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            device_id: parseInt(document.getElementById('config-device-id').value),
+            app_name: document.getElementById('config-app-name').value,
+            bundle_id: document.getElementById('config-bundle-id').value,
+        })
+    });
+    if (res.ok) location.reload();
+    else alert('Error: ' + await res.text());
+}
+
+async function deleteConfig(id) {
+    if (!confirm('Delete this config?')) return;
+    await fetch(`/apps/configs/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+</script>
+{% endblock %}
+

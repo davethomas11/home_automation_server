@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Devices · Home Automation Server{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Apple TV Devices</h1>
+    <button class="btn btn-primary" onclick="scanDevices()">🔍 Scan Network</button>
+</div>
+
+<!-- Scan results (populated by JS) -->
+<div id="scan-results" class="hidden">
+    <div class="page-header" style="margin-top: 1rem;">
+        <h2>Discovered Devices</h2>
+        <div>
+            <button class="btn btn-sm btn-secondary" onclick="selectAllScanned(true)">Select All</button>
+            <button class="btn btn-sm btn-secondary" onclick="selectAllScanned(false)">Clear</button>
+            <button class="btn btn-sm btn-success" onclick="saveSelectedScanned()">Save Selected</button>
+        </div>
+    </div>
+    <div id="scan-summary" class="notice hidden"></div>
+    <div id="scan-list"></div>
+</div>
+
+<!-- Saved devices -->
+<h2>Saved Devices</h2>
+{% if devices %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Identifier</th>
+            <th>IP Address</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for device in devices %}
+        <tr>
+            <td>{{ device.name }}</td>
+            <td class="mono">{{ device.identifier }}</td>
+            <td class="mono">{{ device.ip_address }}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteDevice({{ device.id }})">Delete</button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="notice">No devices saved. Use the Scan button to discover Apple TVs on your network.</div>
+{% endif %}
+
+<!-- Add device manually -->
+<details class="collapsible">
+    <summary>➕ Add device manually</summary>
+    <form class="form" onsubmit="addDevice(event)">
+        <label>Name <input type="text" id="dev-name" required placeholder="Living Room Apple TV" /></label>
+        <label>Identifier <input type="text" id="dev-identifier" required placeholder="AA:BB:CC:DD:EE:FF" /></label>
+        <label>IP Address <input type="text" id="dev-ip" required placeholder="192.168.1.100" /></label>
+        <button type="submit" class="btn btn-primary">Save Device</button>
+    </form>
+</details>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let lastScanned = [];
+
+async function scanDevices() {
+    const btn = document.querySelector('button[onclick="scanDevices()"]');
+    btn.textContent = '⏳ Scanning…';
+    btn.disabled = true;
+    try {
+        const [scanRes, savedRes] = await Promise.all([
+            fetch('/devices/scan', { method: 'POST' }),
+            fetch('/devices/')
+        ]);
+        const data = await scanRes.json();
+        const saved = await savedRes.json();
+        const savedByIdentifier = new Set(saved.map(d => d.identifier));
+
+        lastScanned = data.map(d => ({
+            ...d,
+            alreadySaved: savedByIdentifier.has(d.identifier)
+        }));
+
+        const list = document.getElementById('scan-list');
+        const summary = document.getElementById('scan-summary');
+        list.innerHTML = '';
+        if (lastScanned.length === 0) {
+            list.innerHTML = '<p class="notice">No devices found.</p>';
+            summary.classList.add('hidden');
+        } else {
+            const existingCount = lastScanned.filter(d => d.alreadySaved).length;
+            summary.textContent = `${lastScanned.length} discovered · ${existingCount} already saved`;
+            summary.classList.remove('hidden');
+
+            lastScanned.forEach((d, idx) => {
+                const badge = d.alreadySaved
+                    ? '<span class="badge" style="border-color:#34d399;color:#34d399;">Already saved</span>'
+                    : '<span class="badge" style="border-color:#7c6af7;color:#7c6af7;">New</span>';
+                list.innerHTML += `
+                <div class="scan-card">
+                    <input type="checkbox" class="scan-check" data-index="${idx}" ${d.alreadySaved ? '' : 'checked'} ${d.alreadySaved ? 'disabled' : ''} />
+                    <strong>${d.name}</strong> · ${d.model} (${d.os_version})<br/>
+                    <span class="mono">${d.identifier}</span> · ${d.ip_address}
+                    ${badge}
+                    <button class="btn btn-sm btn-success" ${d.alreadySaved ? 'disabled' : ''} onclick='saveScanned(${JSON.stringify(d)})'>Save</button>
+                </div>`;
+            });
+        }
+        document.getElementById('scan-results').classList.remove('hidden');
+    } catch(e) {
+        alert('Scan failed: ' + e);
+    } finally {
+        btn.textContent = '🔍 Scan Network';
+        btn.disabled = false;
+    }
+}
+
+function selectAllScanned(selectAll) {
+    document.querySelectorAll('.scan-check').forEach(cb => {
+        if (!cb.disabled) cb.checked = selectAll;
+    });
+}
+
+async function saveSelectedScanned() {
+    const selected = Array.from(document.querySelectorAll('.scan-check:checked'))
+        .filter(cb => !cb.disabled)
+        .map(cb => lastScanned[parseInt(cb.dataset.index, 10)])
+        .filter(Boolean)
+        .map(d => ({ name: d.name, identifier: d.identifier, ip_address: d.ip_address }));
+
+    if (selected.length === 0) {
+        alert('No new devices selected.');
+        return;
+    }
+
+    const res = await fetch('/devices/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ devices: selected })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        alert('Batch save failed: ' + (data.detail || 'unknown error'));
+        return;
+    }
+    alert(`Saved ${data.added_count} device(s), skipped ${data.skipped_count}.`);
+    location.reload();
+}
+
+async function saveScanned(d) {
+    await fetch('/devices/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name: d.name, identifier: d.identifier, ip_address: d.ip_address })
+    });
+    location.reload();
+}
+
+async function addDevice(e) {
+    e.preventDefault();
+    await fetch('/devices/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('dev-name').value,
+            identifier: document.getElementById('dev-identifier').value,
+            ip_address: document.getElementById('dev-ip').value,
+        })
+    });
+    location.reload();
+}
+
+async function deleteDevice(id) {
+    if (!confirm('Delete this device?')) return;
+    await fetch(`/devices/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+</script>
+{% endblock %}
+

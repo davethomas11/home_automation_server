@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Pairing · Home Automation Server{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Device Pairing</h1>
+</div>
+
+{% if not devices %}
+<div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
+{% else %}
+
+<!-- Start pairing form -->
+<div class="card-form">
+    <h2>Pair a Device</h2>
+    <form class="form" onsubmit="startPairing(event)">
+        <label>Device
+            <select id="pair-device-id">
+                {% for device in devices %}
+                <option value="{{ device.id }}">{{ device.name }} ({{ device.ip_address }})</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Protocol
+            <select id="pair-protocol">
+                <option value="MRP">MRP (Apple TV 4+)</option>
+                <option value="Companion">Companion</option>
+                <option value="AirPlay">AirPlay</option>
+            </select>
+        </label>
+        <button type="submit" class="btn btn-primary">Start Pairing</button>
+    </form>
+    <div id="pairing-status" class="notice hidden"></div>
+
+    <div id="pin-form" class="hidden" style="margin-top:1rem;">
+        <form class="form" onsubmit="finishPairing(event)">
+            <label>PIN shown on TV
+                <input type="text" id="pairing-pin" maxlength="4" placeholder="e.g. 1234" required />
+            </label>
+            <button type="submit" class="btn btn-success">Submit PIN &amp; Save</button>
+        </form>
+    </div>
+</div>
+
+<!-- Saved credentials -->
+<h2 style="margin-top:2rem;">Saved Credentials</h2>
+{% for device in devices %}
+    {% if device.id in pairing_map %}
+    <div class="credential-block">
+        <h3>{{ device.name }}</h3>
+        <table class="data-table">
+            <thead><tr><th>Protocol</th><th>Credentials (truncated)</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for p in pairing_map[device.id] %}
+            <tr>
+                <td><span class="badge">{{ p.protocol }}</span></td>
+                <td class="mono truncate">{{ p.credentials[:40] }}…</td>
+                <td><button class="btn btn-sm btn-danger" onclick="deletePairing({{ p.id }})">Delete</button></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentDeviceId = null;
+let currentProtocol = null;
+
+async function startPairing(e) {
+    e.preventDefault();
+    currentDeviceId = document.getElementById('pair-device-id').value;
+    currentProtocol = document.getElementById('pair-protocol').value;
+    const status = document.getElementById('pairing-status');
+    status.classList.remove('hidden');
+    status.textContent = '⏳ Starting pairing…';
+    try {
+        const res = await fetch('/pairing/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: parseInt(currentDeviceId), protocol: currentProtocol })
+        });
+        const data = await res.json();
+        if (!res.ok) { status.textContent = '❌ ' + (data.detail || 'Error'); return; }
+        status.textContent = '✅ ' + data.message;
+        document.getElementById('pin-form').classList.remove('hidden');
+    } catch(err) {
+        status.textContent = '❌ ' + err;
+    }
+}
+
+async function finishPairing(e) {
+    e.preventDefault();
+    const pin = document.getElementById('pairing-pin').value;
+    const status = document.getElementById('pairing-status');
+    status.textContent = '⏳ Verifying PIN…';
+    try {
+        const res = await fetch('/pairing/finish', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: parseInt(currentDeviceId), protocol: currentProtocol, pin })
+        });
+        const data = await res.json();
+        if (!res.ok) { status.textContent = '❌ ' + (data.detail || 'Error'); return; }
+        status.textContent = '✅ Paired successfully!';
+        document.getElementById('pin-form').classList.add('hidden');
+        setTimeout(() => location.reload(), 1500);
+    } catch(err) {
+        status.textContent = '❌ ' + err;
+    }
+}
+
+async function deletePairing(id) {
+    if (!confirm('Delete this pairing credential?')) return;
+    await fetch(`/pairing/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+</script>
+{% endblock %}
+

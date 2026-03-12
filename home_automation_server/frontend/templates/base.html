@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Vectrune{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="logo" href="/ui">🍎 Home Automation</a>
+            <nav>
+                <a href="/ui/devices">Devices</a>
+                <a href="/ui/pairing">Pairing</a>
+                <a href="/ui/controls">Controls</a>
+                <a href="/ui/automations">Automations</a>
+                <a href="/ui/apps">Apps</a>
+                <a href="/docs" target="_blank">API Docs ↗</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>Home Automation Server · powered by pyatv &amp; FastAPI</p>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+
