@@ -73,6 +73,38 @@ nav a {
 
 nav a:hover { color: var(--accent-hover); }
 
+.header-subnav {
+    border-top: 1px solid var(--border);
+}
+
+.header-subnav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.45rem 0 0.55rem;
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.header-subnav-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.82rem;
+    padding: 0.12rem 0;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.header-subnav-link:hover {
+    color: var(--accent-hover);
+}
+
+.header-subnav-link.is-active {
+    color: var(--text);
+    border-color: var(--accent);
+}
+
 /* ── Main container ── */
 .container {
     max-width: 1200px;
@@ -494,6 +526,767 @@ nav a:hover { color: var(--accent-hover); }
     margin-top: 1rem;
 }
 
+.controls-provider-stack {
+    display: grid;
+    gap: 2rem;
+}
+
+.controls-provider-section {
+    display: grid;
+    gap: 1rem;
+}
+
+.controls-provider-header {
+    margin-bottom: 0;
+}
+
+.controls-provider-header h2 {
+    margin-bottom: 0.25rem;
+    font-size: 1.2rem;
+}
+
+.automation-recorder-launcher {
+    position: fixed;
+    right: 0;
+    top: 40%;
+    transform: translateY(-50%);
+    z-index: 38;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.automation-recorder-drawer {
+    position: fixed;
+    top: 88px;
+    right: 0;
+    width: min(420px, calc(100vw - 1.2rem));
+    max-height: calc(100vh - 110px);
+    z-index: 39;
+    transform: translateX(102%);
+    transition: transform 0.2s ease;
+    pointer-events: none;
+}
+
+.automation-recorder-drawer.is-open {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.automation-recorder {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 1rem;
+    height: 100%;
+    overflow: auto;
+}
+
+.automation-recorder-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.automation-recorder-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.automation-recorder-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.automation-recorder-controls {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.automation-recorder-log-anchor {
+    position: relative;
+}
+
+.recording-log-popover {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.45rem);
+    width: min(360px, 86vw);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    padding: 0.55rem;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
+    z-index: 2;
+}
+
+.recording-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.recording-log-entries {
+    max-height: 180px;
+    overflow: auto;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.recording-log-entry {
+    font-size: 0.82rem;
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    border-radius: 0.45rem;
+    padding: 0.35rem 0.45rem;
+}
+
+.recording-pulse-overlay {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--surface);
+    border: 1px solid var(--danger);
+    border-radius: 999px;
+    padding: 0.4rem 0.7rem;
+    color: var(--danger);
+    font-size: 0.8rem;
+    font-weight: 600;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.recording-pulse-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--danger);
+    animation: recorder-pulse 1.2s ease-in-out infinite;
+}
+
+.recording-pulse-overlay.is-flash {
+    animation: recorder-flash 0.45s ease;
+}
+
+@keyframes recorder-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+@keyframes recorder-flash {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 40%, transparent); }
+    100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--danger) 0%, transparent); }
+}
+
+.cp-device-selector {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.cp-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    flex: 1 1 280px;
+}
+
+.cp-select,
+.cp-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: var(--sans-font);
+    padding: 0.55rem 0.75rem;
+    width: 100%;
+}
+
+.cp-select:focus,
+.cp-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.cp-power-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.cp-device-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.cp-device-title {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.cp-device-meta {
+    color: var(--text-muted);
+}
+
+.cp-power-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.cp-badge {
+    min-width: 88px;
+    text-align: center;
+}
+
+.cp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+.cp-panel {
+    margin-bottom: 0;
+}
+
+.cp-panel-wide {
+    grid-column: 1 / -1;
+}
+
+.cp-panel-title {
+    margin-bottom: 0.85rem;
+    font-size: 1rem;
+}
+
+.cp-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.cp-dpad {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(60px, 76px));
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.cp-btn-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.55rem;
+}
+
+.cp-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.cp-dpad-center {
+    min-height: 52px;
+}
+
+.cp-input-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.cp-input-row .btn {
+    flex: 0 0 auto;
+}
+
+.cp-input-row .cp-input {
+    flex: 1 1 260px;
+}
+
+.cp-apps-results {
+    margin-top: 0.85rem;
+}
+
+.remote-page {
+    display: grid;
+    gap: 1rem;
+}
+
+.remote-layout {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.remote-layout-apple {
+    grid-template-columns: minmax(260px, 320px) 1fr;
+}
+
+.remote-layout-samsung {
+    grid-template-columns: minmax(280px, 340px) 1fr;
+}
+
+.remote-shell {
+    background: linear-gradient(180deg, #3a3a44 0%, #23232b 55%, #17171d 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 40px;
+    padding: 1.2rem 1rem 1.4rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 22px 40px rgba(0,0,0,0.35);
+    display: grid;
+    gap: 0.9rem;
+    justify-items: center;
+}
+
+.remote-shell-apple {
+    min-height: 720px;
+    max-width: 320px;
+}
+
+.remote-shell-samsung {
+    min-height: 720px;
+    max-width: 340px;
+    border-radius: 36px;
+}
+
+.remote-shell-top {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.remote-shell-top-samsung {
+    justify-content: flex-end;
+}
+
+.remote-icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.1s, background 0.15s, border-color 0.15s;
+}
+
+.remote-icon-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.14);
+}
+
+.remote-icon-btn-danger {
+    background: rgba(248, 113, 113, 0.18);
+    border-color: rgba(248, 113, 113, 0.55);
+    color: #fecaca;
+}
+
+.remote-touchpad {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.12), rgba(255,255,255,0.02) 62%, rgba(0,0,0,0.28) 100%);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 6px 16px rgba(255,255,255,0.05), inset 0 -10px 18px rgba(0,0,0,0.25);
+}
+
+.remote-touchpad-samsung {
+    width: 210px;
+    height: 210px;
+}
+
+.remote-direction,
+.remote-touchpad-center {
+    position: absolute;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.remote-touchpad-center {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.remote-touchpad-center-samsung {
+    font-size: 0.8rem;
+}
+
+.remote-direction-up {
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.remote-direction-left {
+    top: 50%;
+    left: 18px;
+    transform: translateY(-50%);
+}
+
+.remote-direction-right {
+    top: 50%;
+    right: 18px;
+    transform: translateY(-50%);
+}
+
+.remote-direction-down {
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.remote-pill-row {
+    width: 100%;
+    display: grid;
+    gap: 0.55rem;
+}
+
+.remote-pill-row-split {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.remote-pill-btn {
+    min-height: 48px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.remote-media-cluster {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 52px 1fr 52px;
+    gap: 0.65rem;
+    align-items: center;
+}
+
+.remote-play-btn,
+.remote-small-btn {
+    min-height: 54px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.remote-play-btn {
+    border-radius: 999px;
+    font-size: 1.1rem;
+}
+
+.remote-small-btn {
+    border-radius: 18px;
+}
+
+.remote-rocker-group {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.8rem;
+}
+
+.remote-rocker {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 28px;
+    display: grid;
+    justify-items: center;
+    overflow: hidden;
+}
+
+.remote-rocker-btn {
+    width: 100%;
+    min-height: 56px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.remote-rocker-label {
+    width: 100%;
+    text-align: center;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.remote-companion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.remote-card {
+    margin-bottom: 0;
+}
+
+.remote-card-wide {
+    grid-column: 1 / -1;
+}
+
+/* ── Samsung-specific remote buttons ── */
+
+.samsung-top-row {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Input switching row inside the remote shell */
+.samsung-input-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+}
+
+.samsung-input-row-secondary {
+    grid-template-columns: repeat(3, 1fr);
+    opacity: 0.72;
+}
+
+.samsung-input-btn {
+    min-height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.samsung-input-btn:hover {
+    background: rgba(124,106,247,0.22);
+    border-color: rgba(124,106,247,0.55);
+    opacity: 1;
+}
+
+.samsung-input-btn-primary {
+    background: rgba(124,106,247,0.18);
+    border-color: rgba(124,106,247,0.4);
+    opacity: 1;
+}
+
+/* Companion card inputs grid */
+.samsung-inputs-companion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 0.5rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+.samsung-input-companion-btn {
+    min-height: 46px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.samsung-input-companion-btn:hover {
+    background: rgba(124,106,247,0.18);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.samsung-input-companion-primary {
+    background: rgba(124,106,247,0.14);
+    border-color: rgba(124,106,247,0.45);
+}
+
+.samsung-input-tier-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 0.6rem;
+    margin-bottom: 0.25rem;
+}
+
+.samsung-input-tier-warning {
+    color: #fbbf24;
+}
+
+.samsung-source-btn {
+    flex: 1;
+    min-height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.samsung-source-btn:hover { background: rgba(255,255,255,0.15); }
+
+.samsung-sys-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.45rem;
+}
+
+.samsung-sys-btn {
+    min-height: 42px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.07);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.15s;
+}
+
+.samsung-sys-btn:hover { background: rgba(255,255,255,0.14); }
+
+.samsung-nav-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 44px 1fr;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.samsung-nav-btn {
+    min-height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.07);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.samsung-nav-btn:hover { background: rgba(255,255,255,0.14); }
+
+.samsung-nav-btn-home {
+    border-radius: 50%;
+    font-size: 1.1rem;
+    padding: 0;
+}
+
+.samsung-rocker-group {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.samsung-media-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.samsung-media-btn {
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.07);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.15s;
+}
+
+.samsung-media-btn:hover { background: rgba(255,255,255,0.15); }
+
+.samsung-media-btn-play {
+    background: rgba(124,106,247,0.22);
+    border-color: rgba(124,106,247,0.55);
+}
+
+.samsung-colour-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.45rem;
+}
+
+.samsung-colour-btn {
+    min-height: 44px;
+    border-radius: 999px;
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: opacity 0.15s, transform 0.1s;
+}
+
+.samsung-colour-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+.samsung-colour-red    { background: #e53935; }
+.samsung-colour-green  { background: #43a047; }
+.samsung-colour-yellow { background: #f9a825; }
+.samsung-colour-blue   { background: #1e88e5; }
+
+.samsung-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.samsung-num-btn {
+    min-height: 52px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.12);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.samsung-num-btn:hover {
+    background: rgba(124,106,247,0.18);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
 /* ── Automation builder ── */
 .automation-builder {
     display: grid;
@@ -580,6 +1373,13 @@ nav a:hover { color: var(--accent-hover); }
         justify-content: center;
     }
     nav a { font-size: 0.8rem; }
+    .header-subnav-inner {
+        gap: 0.65rem;
+        padding: 0.35rem 0 0.45rem;
+    }
+    .header-subnav-link {
+        font-size: 0.74rem;
+    }
 
     /* Container & spacing */
     .container { padding: 0 1rem; margin: 1rem auto; }
@@ -656,6 +1456,80 @@ nav a:hover { color: var(--accent-hover); }
         gap: 0.5rem;
         padding: 0.75rem;
     }
+    .controls-provider-header {
+        align-items: flex-start;
+    }
+    .remote-layout-apple,
+    .remote-layout-samsung {
+        grid-template-columns: 1fr;
+    }
+    .remote-shell {
+        max-width: 100%;
+        min-height: auto;
+    }
+    .remote-touchpad,
+    .remote-touchpad-samsung {
+        width: 200px;
+        height: 200px;
+    }
+    .cp-device-selector,
+    .cp-power-row,
+    .cp-panel-header,
+    .cp-input-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .cp-grid,
+    .cp-btn-grid {
+        grid-template-columns: 1fr;
+    }
+    .cp-dpad {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .remote-companion-grid {
+        grid-template-columns: 1fr;
+    }
+    .remote-rocker-group,
+    .samsung-rocker-group,
+    .remote-pill-row-split,
+    .remote-media-cluster,
+    .samsung-media-row,
+    .samsung-sys-row {
+        grid-template-columns: 1fr;
+    }
+    .samsung-colour-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    .samsung-numpad {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .samsung-nav-row {
+        grid-template-columns: 1fr 44px 1fr;
+    }
+    .cp-input-row .btn,
+    .cp-input-row .cp-input {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .automation-recorder-launcher {
+        top: auto;
+        bottom: 0.9rem;
+        right: 0.8rem;
+        transform: none;
+        border-radius: 999px;
+    }
+    .automation-recorder-drawer {
+        top: auto;
+        bottom: 4.2rem;
+        right: 0.5rem;
+        width: calc(100vw - 1rem);
+        max-height: 70vh;
+    }
+    .recording-log-popover {
+        right: auto;
+        left: 0;
+        width: min(340px, 82vw);
+    }
 
     /* Automation builder */
     .automation-builder {
@@ -726,3 +1600,224 @@ nav a:hover { color: var(--accent-hover); }
     .controls-direction-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Delay Slider ──────────────────────────────────────────────────────────── */
+.delay-slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.5rem;
+}
+
+.delay-slider-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.delay-slider-display {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 3.5rem;
+    text-align: right;
+}
+
+.delay-slider {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+    height: 4px;
+}
+
+.delay-slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 0 2px;
+}
+
+/* ── Clickable flow table rows ─────────────────────────────────────────────── */
+.flow-table-row {
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.flow-table-row:hover {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.flow-table-row.is-previewing {
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.flow-card {
+    cursor: pointer;
+    transition: box-shadow 0.12s, outline 0.12s;
+}
+
+.flow-card.is-previewing {
+    outline: 2px solid var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ── Flow Visualizer Panel ─────────────────────────────────────────────────── */
+.flow-visualizer {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 1.25rem 1.5rem;
+    margin: 1.25rem 0;
+    animation: viz-slide-in 0.18s ease;
+}
+
+.flow-visualizer.hidden {
+    display: none;
+}
+
+@keyframes viz-slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.flow-visualizer-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.flow-visualizer-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    flex: 1 1 auto;
+}
+
+.flow-visualizer-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    flex: 0 0 auto;
+}
+
+.flow-visualizer-steps {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+}
+
+/* ── Visualizer step nodes ─────────────────────────────────────────────────── */
+.viz-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: color-mix(in srgb, var(--text-muted) 8%, var(--surface));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.85rem;
+    min-width: 220px;
+    flex: 0 0 auto;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.viz-step.is-running {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.viz-step.is-complete {
+    background: color-mix(in srgb, var(--success) 16%, var(--surface));
+    border-color: color-mix(in srgb, var(--success) 65%, var(--border));
+}
+
+.viz-step.is-error {
+    background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--danger) 65%, var(--border));
+}
+
+.viz-step-icon {
+    font-size: 1.1rem;
+    width: 1.6rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.viz-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.viz-step-num {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.viz-step-label {
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+
+/* Arrow and optional delay between steps */
+.viz-link {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 0 0 auto;
+}
+
+.viz-arrow {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.viz-link.is-active .viz-arrow,
+.viz-link.is-complete .viz-arrow {
+    color: var(--success);
+}
+
+.viz-link.is-error .viz-arrow {
+    color: var(--danger);
+}
+
+/* Delay badge between steps */
+.viz-delay {
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.viz-link.is-active .viz-delay,
+.viz-link.is-complete .viz-delay {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 50%, transparent);
+}
+
+@media (max-width: 640px) {
+    .delay-slider-label { flex-direction: column; align-items: flex-start; }
+    .delay-slider-display { text-align: left; }
+    .flow-visualizer { padding: 0.9rem 1rem; }
+    .viz-step { min-width: 180px; }
+}

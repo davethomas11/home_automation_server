@@ -17,8 +17,13 @@ from home_automation_server.models.models import (
     AppLaunchConfigRead,
     AppleTVDevice,
     AppleTVPairing,
+    DeviceKind,
 )
 from home_automation_server.services import pyatv_service
+from home_automation_server.services.provider_resolver import (
+    ProviderResolutionError,
+    resolve_provider,
+)
 
 router = APIRouter()
 
@@ -28,6 +33,17 @@ SessionDep = Annotated[Session, Depends(get_session)]
 class LaunchRequest(BaseModel):
     device_id: int
     bundle_id: str
+
+
+class SamsungLaunchRequest(BaseModel):
+    device_id: int
+    app_id: str
+
+
+class KindLaunchRequest(BaseModel):
+    device_kind: DeviceKind
+    device_id: int
+    app_id: str
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +102,48 @@ async def launch_app(body: LaunchRequest, session: SessionDep):
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
     return {"status": "ok", "bundle_id": body.bundle_id, "device": device.name}
+
+
+async def _launch_with_kind(kind: DeviceKind, device_id: int, app_id: str, session: SessionDep):
+    try:
+        resolved = resolve_provider(kind, device_id, session)
+    except ProviderResolutionError as exc:
+        message = str(exc)
+        if "pair first" in message.lower():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=message)
+
+    try:
+        await resolved.provider.launch_app(app_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+    return {
+        "status": "ok",
+        "app_id": app_id,
+        "device": resolved.device_name,
+        "device_kind": kind.value,
+    }
+
+
+@router.post("/appletv/launch", summary="Launch an app on an Apple TV")
+async def launch_app_appletv(body: LaunchRequest, session: SessionDep):
+    return await _launch_with_kind(DeviceKind.APPLE_TV, body.device_id, body.bundle_id, session)
+
+
+@router.post("/samsung/launch", summary="Launch an app on a Samsung TV")
+async def launch_app_samsung(body: SamsungLaunchRequest, session: SessionDep):
+    return await _launch_with_kind(DeviceKind.SAMSUNG_TV, body.device_id, body.app_id, session)
+
+
+@router.post("/launch/by-kind", summary="Launch an app by device kind")
+async def launch_app_by_kind(body: KindLaunchRequest, session: SessionDep):
+    return await _launch_with_kind(body.device_kind, body.device_id, body.app_id, session)
+
+
+@router.post("/device/{device_kind}/{device_id}/launch/{app_id}", summary="Launch app by kind and device path")
+async def launch_app_by_path(device_kind: DeviceKind, device_id: int, app_id: str, session: SessionDep):
+    return await _launch_with_kind(device_kind, device_id, app_id, session)
 
 
 @router.get("/list/{device_id}", summary="List installed apps on a device")

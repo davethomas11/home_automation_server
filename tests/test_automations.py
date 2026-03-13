@@ -12,6 +12,14 @@ def _create_device(client: TestClient) -> int:
     return res.json()["id"]
 
 
+def _create_samsung_device(client: TestClient) -> int:
+    res = client.post("/devices/samsung", json={
+        "name": "Samsung Test TV", "ip_address": "10.0.0.50", "model_year": 2022, "port": 8002,
+        "token": None, "mac_address": None,
+    })
+    return res.json()["id"]
+
+
 def test_create_and_list_flow(client: TestClient):
     device_id = _create_device(client)
     payload = {
@@ -74,4 +82,47 @@ def test_delete_flow(client: TestClient):
 
     get_res = client.get(f"/automations/{flow_id}")
     assert get_res.status_code == 404
+
+
+def test_create_and_list_samsung_flow_parity_routes(client: TestClient):
+    device_id = _create_samsung_device(client)
+    payload = {
+        "device_id": device_id,
+        "name": "Samsung Home",
+        "trigger_type": "manual",
+        "trigger_payload": "{}",
+        "action_type": "remote_command",
+        "action_payload": '{"command":"home"}',
+    }
+
+    res = client.post("/automations/samsung", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["device_kind"] == "samsung_tv"
+
+    list_res = client.get("/automations/samsung")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) == 1
+
+
+def test_create_and_list_appletv_flow_parity_routes(client: TestClient):
+    device_id = _create_device(client)
+    payload = {
+        "device_id": device_id,
+        "name": "Apple Menu",
+        "trigger_type": "manual",
+        "trigger_payload": "{}",
+        "action_type": "remote_command",
+        "action_payload": '{"command":"menu"}',
+    }
+
+    res = client.post("/automations/appletv", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["device_kind"] == "apple_tv"
+
+    list_res = client.get("/automations/appletv")
+    assert list_res.status_code == 200
+    assert len(list_res.json()) == 1
+
 

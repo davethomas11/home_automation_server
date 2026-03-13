@@ -1,0 +1,189 @@
+{# ── Samsung TV Controls Panel ───────────────────────────────────────── #}
+{# Expects: selected_device (SamsungTVDeviceRead) #}
+
+<div class="remote-page remote-page-samsung">
+	<div class="cp-device-selector card-form">
+		<div class="cp-device-summary">
+			<span class="badge">Samsung TV</span>
+			<h2 class="cp-device-title">{{ selected_device.name }}</h2>
+			<div class="cp-device-meta mono">{{ selected_device.ip_address }}</div>
+		</div>
+		<div class="cp-power-row">
+			<span class="cp-power-label">Model year:</span>
+			<span class="badge cp-badge">{{ selected_device.model_year }}</span>
+		</div>
+	</div>
+
+	<div id="samsung-status" class="notice hidden"></div>
+	<div id="samsung-app-status" class="notice hidden"></div>
+
+	<div class="remote-layout remote-layout-samsung">
+
+		{# ── Physical remote shell ── #}
+		<section class="remote-shell remote-shell-samsung">
+
+		{# Power + Source #}
+		<div class="samsung-top-row">
+			<button class="remote-icon-btn remote-icon-btn-danger" onclick="samsungPower(false)" aria-label="Power off">⏻</button>
+			<button class="samsung-source-btn" onclick="samsungCmd('source')" aria-label="Source">⬡ Source</button>
+		</div>
+
+		{# Input switching — universal methods first #}
+		<div class="samsung-input-row">
+			<button class="samsung-input-btn samsung-input-btn-primary" onclick="samsungCmd('source')" title="Opens the on-screen source picker — works on all models">⬡ Source Menu</button>
+			<button class="samsung-input-btn samsung-input-btn-primary" onclick="samsungCmd('hdmi_cycle')" title="Cycles through HDMI inputs — works on most models">🔄 HDMI Cycle</button>
+		</div>
+		<div class="samsung-input-row samsung-input-row-secondary">
+			<button class="samsung-input-btn" onclick="samsungCmd('hdmi_1')" title="Direct switch — may not work on Tizen 2016+ TVs">HDMI 1</button>
+			<button class="samsung-input-btn" onclick="samsungCmd('hdmi_2')" title="Direct switch — may not work on Tizen 2016+ TVs">HDMI 2</button>
+			<button class="samsung-input-btn" onclick="samsungCmd('hdmi_3')" title="Direct switch — may not work on Tizen 2016+ TVs">HDMI 3</button>
+			<button class="samsung-input-btn" onclick="samsungCmd('hdmi_4')" title="Direct switch — may not work on Tizen 2016+ TVs">HDMI 4</button>
+			<button class="samsung-input-btn" onclick="samsungCmd('av_1')" title="May not work on Tizen 2016+ TVs">AV</button>
+			<button class="samsung-input-btn" onclick="samsungCmd('pc')" title="May not work on Tizen 2016+ TVs">PC</button>
+		</div>
+
+			{# System row: Settings · SmartHub · Guide · Info #}
+			<div class="samsung-sys-row">
+				<button class="samsung-sys-btn" onclick="samsungCmd('settings')"  aria-label="Settings">⚙</button>
+				<button class="samsung-sys-btn" onclick="samsungCmd('smart_hub')" aria-label="Smart Hub">⊞</button>
+				<button class="samsung-sys-btn" onclick="samsungCmd('guide')"     aria-label="Guide">📋</button>
+				<button class="samsung-sys-btn" onclick="samsungCmd('info')"      aria-label="Info">ℹ</button>
+			</div>
+
+			{# D-Pad #}
+			<div class="remote-touchpad remote-touchpad-samsung">
+				<button class="remote-direction remote-direction-up"    onclick="samsungCmd('up')"    aria-label="Up">▲</button>
+				<button class="remote-direction remote-direction-left"  onclick="samsungCmd('left')"  aria-label="Left">◀</button>
+				<button class="remote-direction remote-direction-right" onclick="samsungCmd('right')" aria-label="Right">▶</button>
+				<button class="remote-direction remote-direction-down"  onclick="samsungCmd('down')"  aria-label="Down">▼</button>
+				<button class="remote-touchpad-center remote-touchpad-center-samsung" onclick="samsungCmd('select')" aria-label="Select">OK</button>
+			</div>
+
+			{# Back · Home · Menu #}
+			<div class="samsung-nav-row">
+				<button class="samsung-nav-btn" onclick="samsungCmd('back')">↩ Back</button>
+				<button class="samsung-nav-btn samsung-nav-btn-home" onclick="samsungCmd('home')">⌂</button>
+				<button class="samsung-nav-btn" onclick="samsungCmd('menu')">☰ Menu</button>
+			</div>
+
+			{# Volume · Mute · Channel rockers #}
+			<div class="remote-rocker-group samsung-rocker-group">
+				<div class="remote-rocker">
+					<button class="remote-rocker-btn" onclick="samsungCmd('volume_up')">＋</button>
+					<div class="remote-rocker-label">Vol</div>
+					<button class="remote-rocker-btn" onclick="samsungCmd('volume_down')">－</button>
+				</div>
+				<div class="remote-rocker samsung-rocker-mute">
+					<button class="remote-rocker-btn" onclick="samsungCmd('unmute')">🔈</button>
+					<div class="remote-rocker-label">Mute</div>
+					<button class="remote-rocker-btn" onclick="samsungCmd('mute')">🔇</button>
+				</div>
+				<div class="remote-rocker">
+					<button class="remote-rocker-btn" onclick="samsungCmd('channel_up')">＋</button>
+					<div class="remote-rocker-label">Ch</div>
+					<button class="remote-rocker-btn" onclick="samsungCmd('channel_down')">－</button>
+				</div>
+			</div>
+
+			{# Media transport #}
+			<div class="samsung-media-row">
+				<button class="samsung-media-btn" onclick="samsungCmd('rewind')"       aria-label="Rewind">⏪</button>
+				<button class="samsung-media-btn" onclick="samsungCmd('previous')"     aria-label="Previous">⏮</button>
+				<button class="samsung-media-btn samsung-media-btn-play" onclick="samsungCmd('play')"  aria-label="Play">▶</button>
+				<button class="samsung-media-btn" onclick="samsungCmd('pause')"        aria-label="Pause">⏸</button>
+				<button class="samsung-media-btn" onclick="samsungCmd('stop')"         aria-label="Stop">⏹</button>
+				<button class="samsung-media-btn" onclick="samsungCmd('next')"         aria-label="Next">⏭</button>
+				<button class="samsung-media-btn" onclick="samsungCmd('fast_forward')" aria-label="Fast-forward">⏩</button>
+			</div>
+
+			{# Colour buttons #}
+			<div class="samsung-colour-row">
+				<button class="samsung-colour-btn samsung-colour-red"    onclick="samsungCmd('red')">A</button>
+				<button class="samsung-colour-btn samsung-colour-green"  onclick="samsungCmd('green')">B</button>
+				<button class="samsung-colour-btn samsung-colour-yellow" onclick="samsungCmd('yellow')">C</button>
+				<button class="samsung-colour-btn samsung-colour-blue"   onclick="samsungCmd('blue')">D</button>
+			</div>
+
+		</section>
+
+		{# ── Companion panels ── #}
+		<div class="remote-companion-grid">
+
+			{# Inputs #}
+			<section class="card-form remote-card remote-card-wide">
+				<div class="cp-panel-header">
+					<h3 class="cp-panel-title">Inputs</h3>
+					<button class="btn btn-sm btn-secondary" onclick="samsungFetchSources()">🔄 Refresh</button>
+				</div>
+
+				<p class="samsung-input-tier-label">✅ Works on all models</p>
+				<div id="samsung-inputs-grid" class="samsung-inputs-companion-grid">
+					<button class="samsung-input-companion-btn samsung-input-companion-primary" onclick="samsungCmd('source')">⬡ Source Menu</button>
+					<button class="samsung-input-companion-btn samsung-input-companion-primary" onclick="samsungCmd('hdmi_cycle')">🔄 HDMI Cycle</button>
+				</div>
+
+				<p class="samsung-input-tier-label samsung-input-tier-warning">⚠️ Model-dependent — direct switch, may not work on Tizen 2016+ TVs</p>
+				<div class="samsung-inputs-companion-grid">
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('hdmi_1')">🔌 HDMI 1</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('hdmi_2')">🔌 HDMI 2</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('hdmi_3')">🔌 HDMI 3</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('hdmi_4')">🔌 HDMI 4</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('av_1')">📺 AV</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('component_1')">📺 Component</button>
+					<button class="samsung-input-companion-btn" onclick="samsungCmd('pc')">💻 PC</button>
+				</div>
+
+				<p class="notice" style="margin-bottom:0;">
+					The Samsung WebSocket API is write-only — it cannot report which devices are connected to each port or which input is active. Direct HDMI 1–4 switching only works on pre-2016 Samsung models; on Tizen 2016+ TVs use <strong>Source Menu</strong> or <strong>HDMI Cycle</strong>.
+				</p>
+			</section>
+
+			{# Number pad #}
+			<section class="card-form remote-card">
+				<h3 class="cp-panel-title">Number Pad</h3>
+				<div class="samsung-numpad">
+					<button class="samsung-num-btn" onclick="samsungCmd('num_1')">1</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_2')">2</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_3')">3</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_4')">4</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_5')">5</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_6')">6</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_7')">7</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_8')">8</button>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_9')">9</button>
+					<div></div>
+					<button class="samsung-num-btn" onclick="samsungCmd('num_0')">0</button>
+					<div></div>
+				</div>
+			</section>
+
+			{# Picture / Sound #}
+			<section class="card-form remote-card">
+				<h3 class="cp-panel-title">Picture &amp; Sound</h3>
+				<div class="cp-btn-grid">
+					<button class="btn btn-secondary cp-btn" onclick="samsungCmd('picture_mode')">🖼 Picture Mode</button>
+					<button class="btn btn-secondary cp-btn" onclick="samsungCmd('sound_mode')">🔊 Sound Mode</button>
+				</div>
+			</section>
+
+			{# App launch #}
+			<section class="card-form remote-card remote-card-wide">
+				<h3 class="cp-panel-title">Apps</h3>
+				<form class="form" onsubmit="samsungLaunchApp(event)" style="margin-top:0.75rem;">
+					<label for="samsung-app-id">Samsung App ID</label>
+					<div class="cp-input-row">
+						<input type="text" id="samsung-app-id" placeholder="11101200001" class="cp-input" />
+						<button type="submit" class="btn btn-primary">🚀 Launch</button>
+					</div>
+				</form>
+				<p class="notice" style="margin-bottom:0;">Samsung TVs use numeric app IDs (not Apple bundle IDs).</p>
+				<div style="margin-top:0.75rem;">
+					<button class="btn btn-secondary cp-btn" onclick="samsungPower(true)">☀ Power On (WoL)</button>
+				</div>
+				<p class="notice" style="margin-bottom:0;">Power-on may require Wake-on-LAN depending on model year.</p>
+			</section>
+
+		</div>
+	</div>
+</div>
+

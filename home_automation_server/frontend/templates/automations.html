@@ -6,7 +6,7 @@
     <h1>Automation Flows</h1>
 </div>
 
-{% if not devices %}
+{% if not automation_devices %}
 <div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
 {% else %}
 
@@ -15,11 +15,14 @@
     <summary>➕ Create New Flow</summary>
     <form class="form" onsubmit="createFlow(event)">
         <label>Name <input type="text" id="flow-name" required placeholder="Open Netflix on startup" /></label>
+        <label>Device Type
+            <select id="flow-device-kind" onchange="onDeviceKindChanged()">
+                <option value="apple_tv">Apple TV</option>
+                <option value="samsung_tv">Samsung TV</option>
+            </select>
+        </label>
         <label>Device
             <select id="flow-device-id" onchange="onDeviceChanged()">
-                {% for device in devices %}
-                <option value="{{ device.id }}">{{ device.name }}</option>
-                {% endfor %}
             </select>
         </label>
         <label>Trigger Type
@@ -29,6 +32,24 @@
                 <option value="schedule" disabled>Schedule (coming soon)</option>
             </select>
         </label>
+
+        <!-- Default step delay slider -->
+        <div class="delay-slider-row">
+            <label for="flow-step-delay" class="delay-slider-label">
+                Default delay between steps:
+                <span id="flow-step-delay-value" class="delay-slider-display">0 ms</span>
+            </label>
+            <input
+                type="range"
+                id="flow-step-delay"
+                min="0" max="2000" step="50" value="0"
+                class="delay-slider"
+                oninput="onDelaySliderInput()"
+            />
+            <div class="delay-slider-ticks">
+                <span>0</span><span>500 ms</span><span>1 s</span><span>1.5 s</span><span>2 s</span>
+            </div>
+        </div>
 
         <div class="notice" id="flow-builder-status" style="display:none;"></div>
 
@@ -64,9 +85,13 @@
                     <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('wait_seconds')">Add</button>
                 </div>
 
-                <div class="palette-item" draggable="true" data-action-kind="swipe" ondragstart="onPaletteDragStart(event)">
+                <div class="palette-item" draggable="true" data-action-kind="swipe" ondragstart="onPaletteDragStart(event)" id="palette-swipe">
                     <span>👆 Swipe</span>
                     <button type="button" class="btn btn-sm btn-secondary" onclick="addStep('swipe')">Add</button>
+                </div>
+
+                <div class="notice" style="margin-top:0.5rem;" id="palette-swipe-notice">
+                    Swipe steps are supported on Apple TV devices only.
                 </div>
 
                 <button type="button" class="btn btn-secondary" onclick="loadAppsForDevice(true)">🔄 Refresh App List</button>
@@ -86,8 +111,18 @@
     </form>
 </details>
 
+<!-- Flow visualizer panel (hidden until a row is selected) -->
+<div id="flow-visualizer" class="flow-visualizer hidden">
+    <div class="flow-visualizer-header">
+        <h3 id="flow-visualizer-title">Flow</h3>
+        <div class="flow-visualizer-meta" id="flow-visualizer-meta"></div>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="closeVisualizer()">✕ Close</button>
+    </div>
+    <div id="flow-visualizer-steps" class="flow-visualizer-steps"></div>
+</div>
+
 <!-- Flow list -->
-<h2 style="margin-top:2rem;">Saved Flows</h2>
+<h2 style="margin-top:2rem;">Saved Flows <span class="subtitle" style="font-size:0.85rem;font-weight:400;">— click a row to preview</span></h2>
 {% if flows %}
 <!-- Desktop Table View -->
 <table class="data-table data-table-desktop">
@@ -102,9 +137,17 @@
     </thead>
     <tbody>
     {% for flow in flows %}
-        <tr>
+        {% set flow_key = flow.device_kind ~ ':' ~ flow.device_id %}
+        <tr class="flow-table-row" onclick="previewFlow({{ flow.id }}, event)" data-flow-id="{{ flow.id }}">
             <td>{{ flow.name }}</td>
-            <td>{{ device_map[flow.device_id].name if flow.device_id in device_map else '–' }}</td>
+            <td>
+                {% if flow_key in device_map %}
+                    {{ device_map[flow_key].name }}
+                    <span class="badge">{{ device_map[flow_key].kind }}</span>
+                {% else %}
+                    –
+                {% endif %}
+            </td>
             <td><span class="badge badge-trigger">{{ flow.trigger_type }}</span></td>
             <td><span class="badge badge-action">{{ flow.action_type }}</span></td>
             <td>
@@ -125,14 +168,21 @@
 <!-- Mobile Card View -->
 <div class="flows-card-grid">
     {% for flow in flows %}
-        <div class="flow-card">
+        {% set flow_key = flow.device_kind ~ ':' ~ flow.device_id %}
+        <div class="flow-card" onclick="previewFlow({{ flow.id }}, event)" data-flow-id="{{ flow.id }}">
             <div class="flow-card-header">
                 <h3>{{ flow.name }}</h3>
             </div>
             <div class="flow-card-body">
                 <div class="flow-info-row">
                     <span class="flow-label">Device:</span>
-                    <span class="flow-value">{{ device_map[flow.device_id].name if flow.device_id in device_map else '–' }}</span>
+                    <span class="flow-value">
+                        {% if flow_key in device_map %}
+                            {{ device_map[flow_key].name }} ({{ device_map[flow_key].kind }})
+                        {% else %}
+                            –
+                        {% endif %}
+                    </span>
                 </div>
                 <div class="flow-info-row">
                     <span class="flow-label">Trigger:</span>
@@ -168,18 +218,86 @@
 let steps = [];
 let nextStepId = 1;
 let cachedApps = [];
+let activePreviewId = null;
+let activeVisualizerFlow = null;
+let activeRunToken = 0;
+let activeRunEventSource = null;
+const AUTOMATION_DEVICES = {{ automation_devices_json | safe }};
 
 const REMOTE_COMMAND_OPTIONS = [
     'menu', 'top_menu', 'home', 'home_hold',
     'up', 'down', 'left', 'right', 'select',
     'play_pause', 'play', 'pause', 'stop', 'next', 'previous',
-    'volume_up', 'volume_down'
+    'volume_up', 'volume_down',
+    'channel_up', 'channel_down',
+    'skip_forward', 'skip_backward',
+    'wakeup', 'screensaver',
+    'control_center', 'guide',
 ];
 
+const SAMSUNG_COMMAND_GROUPS = [
+    { label: 'Navigation', commands: ['up', 'down', 'left', 'right', 'select', 'back', 'home', 'menu'] },
+    { label: 'System',     commands: ['source', 'settings', 'info', 'guide', 'smart_hub'] },
+    { label: 'Volume',     commands: ['volume_up', 'volume_down', 'mute', 'unmute'] },
+    { label: 'Channel',    commands: ['channel_up', 'channel_down'] },
+    { label: 'Playback',   commands: ['play', 'pause', 'stop', 'rewind', 'fast_forward', 'previous', 'next'] },
+    { label: 'Number Pad', commands: ['num_0', 'num_1', 'num_2', 'num_3', 'num_4', 'num_5', 'num_6', 'num_7', 'num_8', 'num_9'] },
+    { label: 'Colour',     commands: ['red', 'green', 'yellow', 'blue'] },
+    { label: 'Picture / Sound', commands: ['picture_mode', 'sound_mode'] },
+    { label: 'Inputs',     commands: ['hdmi_cycle', 'hdmi_1', 'hdmi_2', 'hdmi_3', 'hdmi_4', 'av_1', 'component_1', 'pc'] },
+];
+
+// ── Delay slider ──────────────────────────────────────────────────────────────
+function getStepDelayMs() {
+    return parseInt(document.getElementById('flow-step-delay')?.value ?? '0', 10);
+}
+
+function setStepDelayMs(ms) {
+    const slider = document.getElementById('flow-step-delay');
+    const display = document.getElementById('flow-step-delay-value');
+    if (slider) slider.value = Math.min(2000, Math.max(0, ms));
+    if (display) display.textContent = ms === 0 ? '0 ms' : ms >= 1000 ? `${(ms/1000).toFixed(ms%1000===0?0:1)} s` : `${ms} ms`;
+}
+
+function onDelaySliderInput() {
+    setStepDelayMs(getStepDelayMs());
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function getEditingFlowId() {
     const raw = document.getElementById('editing-flow-id').value;
     const id = parseInt(raw, 10);
     return Number.isNaN(id) ? null : id;
+}
+
+function getSelectedDeviceKind() {
+    const kind = document.getElementById('flow-device-kind')?.value || 'apple_tv';
+    return kind === 'samsung_tv' ? 'samsung_tv' : 'apple_tv';
+}
+
+function populateDeviceSelect(preferredDeviceId = null) {
+    const kind = getSelectedDeviceKind();
+    const select = document.getElementById('flow-device-id');
+    if (!select) return;
+    const filtered = AUTOMATION_DEVICES.filter(d => d.kind === kind);
+    select.innerHTML = '';
+    filtered.forEach(device => {
+        const option = document.createElement('option');
+        option.value = String(device.id);
+        option.textContent = `${device.name} (${device.ip_address})`;
+        select.appendChild(option);
+    });
+    if (filtered.length === 0) {
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = `No ${kind === 'apple_tv' ? 'Apple TV' : 'Samsung TV'} devices saved`;
+        select.appendChild(empty);
+        select.disabled = true;
+        return;
+    }
+    select.disabled = false;
+    if (preferredDeviceId != null) select.value = String(preferredDeviceId);
+    if (!select.value) select.value = String(filtered[0].id);
 }
 
 function setEditingFlowId(idOrNull) {
@@ -197,70 +315,40 @@ function setEditMode(enabled) {
 function setBuilderStatus(message, isError = false) {
     const box = document.getElementById('flow-builder-status');
     if (!box) return;
-    if (!message) {
-        box.style.display = 'none';
-        box.textContent = '';
-        box.style.borderColor = '';
-        box.style.color = '';
-        return;
-    }
+    if (!message) { box.style.display = 'none'; box.textContent = ''; box.style.borderColor = ''; box.style.color = ''; return; }
     box.style.display = 'block';
     box.textContent = (isError ? '❌ ' : '✅ ') + message;
-    if (isError) {
-        box.style.borderColor = 'var(--danger)';
-        box.style.color = 'var(--danger)';
-    } else {
-        box.style.borderColor = 'var(--success)';
-        box.style.color = 'var(--success)';
-    }
+    box.style.borderColor = isError ? 'var(--danger)' : 'var(--success)';
+    box.style.color = isError ? 'var(--danger)' : 'var(--success)';
 }
 
+// ── Step editors ──────────────────────────────────────────────────────────────
 function stepTemplate(kind) {
     switch (kind) {
-        case 'power_on':
-            return { id: nextStepId++, type: 'power', payload: { turn_on: true } };
-        case 'power_off':
-            return { id: nextStepId++, type: 'power', payload: { turn_on: false } };
+        case 'power_on':  return { id: nextStepId++, type: 'power', payload: { turn_on: true } };
+        case 'power_off': return { id: nextStepId++, type: 'power', payload: { turn_on: false } };
         case 'launch_app': {
             const bundleId = cachedApps.length > 0 ? (cachedApps[0].bundle_id || '') : '';
             return { id: nextStepId++, type: 'launch_app', payload: { bundle_id: bundleId } };
         }
         case 'remote_command':
-            return { id: nextStepId++, type: 'remote_command', payload: { command: 'menu' } };
-        case 'wait_seconds':
-            return { id: nextStepId++, type: 'wait_seconds', payload: { seconds: 1 } };
-        case 'swipe':
-            return { id: nextStepId++, type: 'swipe', payload: { direction: 'up' } };
-        default:
-            return null;
+            return { id: nextStepId++, type: 'remote_command', payload: { command: getSelectedDeviceKind() === 'samsung_tv' ? 'home' : 'menu' } };
+        case 'wait_seconds': return { id: nextStepId++, type: 'wait_seconds', payload: { seconds: 1 } };
+        case 'swipe':        return { id: nextStepId++, type: 'swipe', payload: { direction: 'up' } };
+        default: return null;
     }
 }
 
-function addStep(kind) {
-    const step = stepTemplate(kind);
-    if (!step) return;
-    steps.push(step);
-    renderSteps();
-}
-
-function removeStep(stepId) {
-    steps = steps.filter(s => s.id !== stepId);
-    renderSteps();
-}
-
+function addStep(kind) { const s = stepTemplate(kind); if (s) { steps.push(s); renderSteps(); } }
+function removeStep(stepId) { steps = steps.filter(s => s.id !== stepId); renderSteps(); }
 function duplicateStep(stepId) {
     const src = steps.find(s => s.id === stepId);
     if (!src) return;
-    const copy = {
-        id: nextStepId++,
-        type: src.type,
-        payload: JSON.parse(JSON.stringify(src.payload || {})),
-    };
+    const copy = { id: nextStepId++, type: src.type, payload: JSON.parse(JSON.stringify(src.payload || {})) };
     const idx = steps.findIndex(s => s.id === stepId);
     steps.splice(idx + 1, 0, copy);
     renderSteps();
 }
-
 function moveStep(fromIndex, toIndex) {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
     const [item] = steps.splice(fromIndex, 1);
@@ -268,125 +356,94 @@ function moveStep(fromIndex, toIndex) {
     renderSteps();
 }
 
-function onPaletteDragStart(event) {
-    event.dataTransfer.setData('text/action-kind', event.currentTarget.dataset.actionKind);
-}
-
-function onStepDragStart(event) {
-    event.dataTransfer.setData('text/step-index', event.currentTarget.dataset.index);
-}
-
-function onStepDragOver(event) {
-    event.preventDefault();
-}
-
+function onPaletteDragStart(event) { event.dataTransfer.setData('text/action-kind', event.currentTarget.dataset.actionKind); }
+function onStepDragStart(event)    { event.dataTransfer.setData('text/step-index', event.currentTarget.dataset.index); }
+function onStepDragOver(event)     { event.preventDefault(); }
 function onStepDrop(event) {
     event.preventDefault();
     const from = parseInt(event.dataTransfer.getData('text/step-index'), 10);
-    const to = parseInt(event.currentTarget.dataset.index, 10);
-    if (!Number.isNaN(from) && !Number.isNaN(to)) {
-        moveStep(from, to);
-    }
+    const to   = parseInt(event.currentTarget.dataset.index, 10);
+    if (!Number.isNaN(from) && !Number.isNaN(to)) moveStep(from, to);
 }
-
-function onDropzoneDragOver(event) {
-    event.preventDefault();
-}
-
+function onDropzoneDragOver(event) { event.preventDefault(); }
 function onDropzoneDrop(event) {
     event.preventDefault();
     const kind = event.dataTransfer.getData('text/action-kind');
-    if (kind) {
-        addStep(kind);
-    }
+    if (kind) addStep(kind);
 }
 
 function renderLaunchAppEditor(step, index) {
     const options = cachedApps.map(a => {
         const selected = a.bundle_id === step.payload.bundle_id ? 'selected' : '';
-        return `<option value="${escapeHtml(a.bundle_id || '')}" ${selected}>${escapeHtml(a.name || 'Unknown')} (${escapeHtml(a.bundle_id || '')})</option>`;
+        return `<option value="${escapeHtml(a.bundle_id||'')}" ${selected}>${escapeHtml(a.name||'Unknown')} (${escapeHtml(a.bundle_id||'')})</option>`;
     }).join('');
-
     const hasApps = cachedApps.length > 0;
     return `
         <label>App
-            <select ${hasApps ? '' : 'disabled'} data-step-index="${index}" onchange="onLaunchAppSelected(event)">
+            <select ${hasApps?'':'disabled'} data-step-index="${index}" onchange="onLaunchAppSelected(event)">
                 ${hasApps ? options : '<option value="">No apps available from device</option>'}
             </select>
         </label>
         <label>Bundle ID
-            <input type="text" value="${escapeHtml(step.payload.bundle_id || '')}" data-step-index="${index}" oninput="onLaunchBundleInput(event)" placeholder="com.netflix.Netflix" />
-        </label>
-    `;
+            <input type="text" value="${escapeHtml(step.payload.bundle_id||'')}" data-step-index="${index}" oninput="onLaunchBundleInput(event)" placeholder="com.netflix.Netflix" />
+        </label>`;
 }
 
 function renderPowerEditor(step, index) {
     const turnOn = !!step.payload.turn_on;
-    return `
-        <label>Power Action
-            <select data-step-index="${index}" onchange="onPowerSelect(event)">
-                <option value="on" ${turnOn ? 'selected' : ''}>Power On</option>
-                <option value="off" ${!turnOn ? 'selected' : ''}>Power Off</option>
-            </select>
-        </label>
-    `;
+    return `<label>Power Action
+        <select data-step-index="${index}" onchange="onPowerSelect(event)">
+            <option value="on" ${turnOn?'selected':''}>Power On</option>
+            <option value="off" ${!turnOn?'selected':''}>Power Off</option>
+        </select></label>`;
 }
 
 function renderRemoteEditor(step, index) {
+    const kind = getSelectedDeviceKind();
+    if (kind === 'samsung_tv') {
+        const groups = SAMSUNG_COMMAND_GROUPS.map(group => {
+            const options = group.commands.map(cmd => {
+                const selected = cmd === step.payload.command ? 'selected' : '';
+                return `<option value="${cmd}" ${selected}>${cmd}</option>`;
+            }).join('');
+            return `<optgroup label="${escapeHtml(group.label)}">${options}</optgroup>`;
+        }).join('');
+        return `<label>Command<select data-step-index="${index}" onchange="onRemoteCommandSelect(event)">${groups}</select></label>`;
+    }
     const options = REMOTE_COMMAND_OPTIONS.map(cmd => {
         const selected = cmd === step.payload.command ? 'selected' : '';
         return `<option value="${cmd}" ${selected}>${cmd}</option>`;
     }).join('');
-    return `
-        <label>Command
-            <select data-step-index="${index}" onchange="onRemoteCommandSelect(event)">
-                ${options}
-            </select>
-        </label>
-    `;
+    return `<label>Command<select data-step-index="${index}" onchange="onRemoteCommandSelect(event)">${options}</select></label>`;
 }
 
 function renderWaitEditor(step, index) {
     const seconds = Number(step.payload.seconds ?? 1);
-    return `
-        <label>Seconds
-            <input type="number" min="0" step="0.1" value="${Number.isFinite(seconds) ? seconds : 1}" data-step-index="${index}" oninput="onWaitSecondsInput(event)" />
-        </label>
-    `;
+    return `<label>Seconds
+        <input type="number" min="0" step="0.1" value="${Number.isFinite(seconds)?seconds:1}" data-step-index="${index}" oninput="onWaitSecondsInput(event)" /></label>`;
 }
 
 function renderSwipeEditor(step, index) {
-    const SWIPE_DIRECTIONS = ['up', 'down', 'left', 'right'];
+    const dirs = ['up','down','left','right'];
     const current = step.payload.direction || 'up';
-    const options = SWIPE_DIRECTIONS.map(d =>
-        `<option value="${d}" ${d === current ? 'selected' : ''}>${d.charAt(0).toUpperCase() + d.slice(1)}</option>`
-    ).join('');
-    return `
-        <label>Direction
-            <select data-step-index="${index}" onchange="onSwipeDirectionSelect(event)">
-                ${options}
-            </select>
-        </label>
-    `;
+    const options = dirs.map(d => `<option value="${d}" ${d===current?'selected':''}>${d.charAt(0).toUpperCase()+d.slice(1)}</option>`).join('');
+    return `<label>Direction<select data-step-index="${index}" onchange="onSwipeDirectionSelect(event)">${options}</select></label>`;
 }
 
 function renderSteps() {
     const container = document.getElementById('flow-steps');
     if (!container) return;
-
     if (steps.length === 0) {
         container.innerHTML = '<div class="notice">No steps yet. Drag an action from the palette to begin.</div>';
         return;
     }
-
     container.innerHTML = steps.map((step, index) => {
         let editor = '';
-        if (step.type === 'launch_app') editor = renderLaunchAppEditor(step, index);
-        if (step.type === 'power') editor = renderPowerEditor(step, index);
+        if (step.type === 'launch_app')     editor = renderLaunchAppEditor(step, index);
+        if (step.type === 'power')          editor = renderPowerEditor(step, index);
         if (step.type === 'remote_command') editor = renderRemoteEditor(step, index);
-        if (step.type === 'wait_seconds') editor = renderWaitEditor(step, index);
-        if (step.type === 'swipe') editor = renderSwipeEditor(step, index);
-
+        if (step.type === 'wait_seconds')   editor = renderWaitEditor(step, index);
+        if (step.type === 'swipe')          editor = renderSwipeEditor(step, index);
         return `
             <div class="sequence-step" draggable="true" data-index="${index}" ondragstart="onStepDragStart(event)" ondragover="onStepDragOver(event)" ondrop="onStepDrop(event)">
                 <div class="sequence-step-header">
@@ -396,182 +453,125 @@ function renderSteps() {
                         <button type="button" class="btn btn-sm btn-danger" onclick="removeStep(${step.id})">Remove</button>
                     </div>
                 </div>
-                <div class="form" style="margin-top:0.5rem;">
-                    ${editor}
-                </div>
-            </div>
-        `;
+                <div class="form" style="margin-top:0.5rem;">${editor}</div>
+            </div>`;
     }).join('');
 }
 
-function onPowerSelect(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    steps[idx].payload.turn_on = event.currentTarget.value === 'on';
-}
-
-function onRemoteCommandSelect(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    steps[idx].payload.command = event.currentTarget.value;
-}
-
-function onWaitSecondsInput(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    const value = parseFloat(event.currentTarget.value);
-    steps[idx].payload.seconds = Number.isNaN(value) ? 0 : Math.max(0, value);
-}
-
-function onSwipeDirectionSelect(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    steps[idx].payload.direction = event.currentTarget.value;
-}
-
-function onLaunchAppSelected(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    steps[idx].payload.bundle_id = event.currentTarget.value;
-    renderSteps();
-}
-
-function onLaunchBundleInput(event) {
-    const idx = parseInt(event.currentTarget.dataset.stepIndex, 10);
-    if (Number.isNaN(idx) || !steps[idx]) return;
-    steps[idx].payload.bundle_id = event.currentTarget.value.trim();
-}
+// ── Event handlers ────────────────────────────────────────────────────────────
+function onPowerSelect(event)         { const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]) steps[idx].payload.turn_on = event.currentTarget.value==='on'; }
+function onRemoteCommandSelect(event) { const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]) steps[idx].payload.command = event.currentTarget.value; }
+function onWaitSecondsInput(event)    { const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]) steps[idx].payload.seconds = Math.max(0,parseFloat(event.currentTarget.value)||0); }
+function onSwipeDirectionSelect(event){ const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]) steps[idx].payload.direction = event.currentTarget.value; }
+function onLaunchAppSelected(event)   { const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]){ steps[idx].payload.bundle_id=event.currentTarget.value; renderSteps(); } }
+function onLaunchBundleInput(event)   { const idx=parseInt(event.currentTarget.dataset.stepIndex,10); if(!Number.isNaN(idx)&&steps[idx]) steps[idx].payload.bundle_id=event.currentTarget.value.trim(); }
 
 async function loadAppsForDevice(showStatus = false) {
+    const kind = getSelectedDeviceKind();
+    if (kind !== 'apple_tv') {
+        cachedApps = [];
+        renderSteps();
+        if (showStatus) setBuilderStatus('Samsung app discovery is not available yet. Enter app IDs manually in Launch App step.', false);
+        return;
+    }
     const deviceId = parseInt(document.getElementById('flow-device-id').value, 10);
     if (Number.isNaN(deviceId)) return;
     try {
         const res = await fetch(`/apps/list/${deviceId}`);
         const data = await res.json();
-        if (!res.ok) {
-            cachedApps = [];
-            renderSteps();
-            if (showStatus) {
-                setBuilderStatus(data.detail || 'Could not load apps from device', true);
-            }
-            return;
-        }
-
+        if (!res.ok) { cachedApps = []; renderSteps(); if (showStatus) setBuilderStatus(data.detail||'Could not load apps from device', true); return; }
         cachedApps = Array.isArray(data) ? data : [];
-        if (showStatus) {
-            setBuilderStatus(`Loaded ${cachedApps.length} app(s) for selected device.`, false);
-        }
+        if (showStatus) setBuilderStatus(`Loaded ${cachedApps.length} app(s) for selected device.`, false);
         renderSteps();
     } catch (err) {
-        cachedApps = [];
-        renderSteps();
-        if (showStatus) {
-            setBuilderStatus(String(err), true);
-        }
+        cachedApps = []; renderSteps();
+        if (showStatus) setBuilderStatus(String(err), true);
     }
 }
 
-async function onDeviceChanged() {
+async function onDeviceChanged() { await loadAppsForDevice(true); }
+
+function updatePaletteForKind() {
+    const isSamsung = getSelectedDeviceKind() === 'samsung_tv';
+    const swipeItem   = document.getElementById('palette-swipe');
+    const swipeNotice = document.getElementById('palette-swipe-notice');
+    if (swipeItem)   swipeItem.style.display   = isSamsung ? 'none' : '';
+    if (swipeNotice) swipeNotice.style.display  = isSamsung ? 'none' : '';
+}
+
+async function onDeviceKindChanged() {
+    populateDeviceSelect();
+    updatePaletteForKind();
+    renderSteps();
     await loadAppsForDevice(true);
 }
 
-function resetBuilderForNewFlow() {
-    setEditingFlowId(null);
-    setEditMode(false);
-    steps = [];
-    renderSteps();
-}
-
-function cancelEditMode() {
-    resetBuilderForNewFlow();
-    setBuilderStatus('Edit canceled. Creating new flow.', false);
-}
+function resetBuilderForNewFlow() { setEditingFlowId(null); setEditMode(false); steps = []; setStepDelayMs(0); renderSteps(); }
+function cancelEditMode() { resetBuilderForNewFlow(); setBuilderStatus('Edit canceled. Creating new flow.', false); }
 
 function flowToSteps(flow) {
     let payload = {};
-    try {
-        payload = JSON.parse(flow.action_payload || '{}');
-    } catch {
-        payload = {};
-    }
-
+    try { payload = JSON.parse(flow.action_payload || '{}'); } catch { payload = {}; }
     if (flow.action_type === 'sequence' && Array.isArray(payload.actions)) {
         return payload.actions
             .filter(a => a && typeof a === 'object')
-            .map(a => ({
-                id: nextStepId++,
-                type: String(a.type || a.action_type || ''),
-                payload: (a.payload && typeof a.payload === 'object') ? a.payload : {},
-            }))
+            .map(a => ({ id: nextStepId++, type: String(a.type||a.action_type||''), payload: (a.payload&&typeof a.payload==='object') ? a.payload : {} }))
             .filter(s => !!s.type);
     }
-
-    // Backward compatibility: load legacy single-action flow as one visual step.
-    return [{
-        id: nextStepId++,
-        type: String(flow.action_type || 'remote_command'),
-        payload: payload && typeof payload === 'object' ? payload : {},
-    }];
+    return [{ id: nextStepId++, type: String(flow.action_type||'remote_command'), payload: payload&&typeof payload==='object' ? payload : {} }];
 }
 
 async function editFlow(flowId) {
     try {
-        const res = await fetch(`/automations/${flowId}`);
+        const res  = await fetch(`/automations/${flowId}`);
         const flow = await res.json();
-        if (!res.ok) {
-            setBuilderStatus(flow.detail || 'Failed to load flow for editing.', true);
-            return;
-        }
-
+        if (!res.ok) { setBuilderStatus(flow.detail||'Failed to load flow for editing.', true); return; }
         document.getElementById('flow-name').value = flow.name || '';
+        document.getElementById('flow-device-kind').value = flow.device_kind || 'apple_tv';
+        populateDeviceSelect(flow.device_id);
         document.getElementById('flow-device-id').value = String(flow.device_id);
         document.getElementById('flow-trigger-type').value = flow.trigger_type || 'manual';
-
+        // Restore delay slider
+        let payload = {};
+        try { payload = JSON.parse(flow.action_payload || '{}'); } catch {}
+        setStepDelayMs(payload.step_delay_ms ?? 0);
         await loadAppsForDevice(false);
-
         steps = flowToSteps(flow);
         renderSteps();
         setEditingFlowId(flowId);
         setEditMode(true);
         setBuilderStatus(`Editing flow: ${flow.name}`, false);
-
-        // Scroll to top so editor is visible immediately
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-        setBuilderStatus(String(err), true);
-    }
+    } catch (err) { setBuilderStatus(String(err), true); }
 }
 
 async function createFlow(e) {
     e.preventDefault();
-
-    if (steps.length === 0) {
-        setBuilderStatus('Add at least one step to the sequence.', true);
-        return;
-    }
+    const selectedDeviceId = parseInt(document.getElementById('flow-device-id').value, 10);
+    if (Number.isNaN(selectedDeviceId)) { setBuilderStatus('Select a valid device before saving this flow.', true); return; }
+    if (steps.length === 0) { setBuilderStatus('Add at least one step to the sequence.', true); return; }
 
     const sequencePayload = {
-        actions: steps.map(step => ({
-            type: step.type,
-            payload: step.payload,
-        }))
+        step_delay_ms: getStepDelayMs(),
+        actions: steps.map(step => ({ type: step.type, payload: step.payload })),
     };
 
     const editingId = getEditingFlowId();
-    const endpoint = editingId ? `/automations/${editingId}` : '/automations/';
-    const method = editingId ? 'PUT' : 'POST';
+    const endpoint  = editingId ? `/automations/${editingId}` : '/automations/';
+    const method    = editingId ? 'PUT' : 'POST';
 
     const res = await fetch(endpoint, {
         method,
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             name: document.getElementById('flow-name').value,
-            device_id: parseInt(document.getElementById('flow-device-id').value),
+            device_kind: getSelectedDeviceKind(),
+            device_id: selectedDeviceId,
             trigger_type: document.getElementById('flow-trigger-type').value,
             trigger_payload: '{}',
             action_type: 'sequence',
             action_payload: JSON.stringify(sequencePayload),
-        })
+        }),
     });
 
     if (res.ok) {
@@ -582,16 +582,286 @@ async function createFlow(e) {
     }
 }
 
+// ── Flow visualizer ───────────────────────────────────────────────────────────
+const STEP_ICONS = {
+    power:          '⏻',
+    launch_app:     '📦',
+    remote_command: '🎮',
+    wait_seconds:   '⏱',
+    swipe:          '👆',
+};
+
+function stepSummary(step) {
+    const t = step.type || step.action_type || '';
+    const p = step.payload || {};
+    switch (t) {
+        case 'power':          return p.turn_on ? 'Power On' : 'Power Off';
+        case 'launch_app':     return `Launch ${p.bundle_id || p.app_id || '?'}`;
+        case 'remote_command': return `${p.command || '?'}`;
+        case 'wait_seconds':   return `Wait ${p.seconds ?? 1} s`;
+        case 'swipe':          return `Swipe ${p.direction || '?'}`;
+        default:               return t;
+    }
+}
+
+function getFlowPayload(flow) {
+    let payload = {};
+    try { payload = JSON.parse(flow.action_payload || '{}'); } catch {}
+    return payload && typeof payload === 'object' ? payload : {};
+}
+
+function getFlowActions(flow, payload) {
+    if (flow.action_type === 'sequence' && Array.isArray(payload.actions)) return payload.actions;
+    if (flow.action_type !== 'sequence') return [{ type: flow.action_type, payload }];
+    return [];
+}
+
+async function fetchFlow(flowId) {
+    const res = await fetch(`/automations/${flowId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to load flow');
+    return data;
+}
+
+function showVisualizer(flowId, loading = false) {
+    const visualizer = document.getElementById('flow-visualizer');
+    const stepsEl = document.getElementById('flow-visualizer-steps');
+    if (!visualizer || !stepsEl) return;
+
+    document.querySelectorAll('.flow-table-row, .flow-card').forEach(el => el.classList.remove('is-previewing'));
+    const row = document.querySelector(`[data-flow-id="${flowId}"]`);
+    if (row) row.classList.add('is-previewing');
+
+    activePreviewId = flowId;
+    visualizer.classList.remove('hidden');
+    if (loading) stepsEl.innerHTML = '<div class="notice">Loading...</div>';
+    visualizer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, Math.max(0, ms | 0)));
+}
+
+function newRunId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return `run-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+function closeRunEventStream() {
+    if (activeRunEventSource) {
+        activeRunEventSource.close();
+        activeRunEventSource = null;
+    }
+}
+
+function resetVisualizerStepState() {
+    document.querySelectorAll('#flow-visualizer-steps .viz-step').forEach(el => {
+        el.classList.remove('is-running', 'is-complete', 'is-error');
+    });
+    document.querySelectorAll('#flow-visualizer-steps .viz-link').forEach(el => {
+        el.classList.remove('is-active', 'is-complete', 'is-error');
+    });
+}
+
+function getVisualizerStep(index) {
+    return document.querySelector(`#flow-visualizer-steps .viz-step[data-step-index="${index}"]`);
+}
+
+function getVisualizerLink(index) {
+    return document.querySelector(`#flow-visualizer-steps .viz-link[data-link-index="${index}"]`);
+}
+
+function applyRunEvent(evt) {
+    const index = Number(evt.step_index);
+    const stepEl = Number.isFinite(index) ? getVisualizerStep(index) : null;
+    const linkEl = Number.isFinite(index) ? getVisualizerLink(index) : null;
+
+    if (evt.type === 'flow_started') {
+        resetVisualizerStepState();
+        return;
+    }
+
+    if (evt.type === 'step_started' && stepEl) {
+        stepEl.classList.remove('is-complete', 'is-error');
+        stepEl.classList.add('is-running');
+        stepEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        return;
+    }
+
+    if (evt.type === 'step_completed' && stepEl) {
+        stepEl.classList.remove('is-running', 'is-error');
+        stepEl.classList.add('is-complete');
+        return;
+    }
+
+    if (evt.type === 'step_failed' && stepEl) {
+        stepEl.classList.remove('is-running', 'is-complete');
+        stepEl.classList.add('is-error');
+        if (linkEl) linkEl.classList.add('is-error');
+        return;
+    }
+
+    if (evt.type === 'delay_started' && linkEl) {
+        linkEl.classList.add('is-active');
+        return;
+    }
+
+    if (evt.type === 'delay_completed' && linkEl) {
+        linkEl.classList.remove('is-active');
+        linkEl.classList.add('is-complete');
+        return;
+    }
+
+    if (evt.type === 'flow_failed' && stepEl) {
+        stepEl.classList.remove('is-running');
+        stepEl.classList.add('is-error');
+    }
+}
+
+function startRunEventStream(flowId, runId, token) {
+    closeRunEventStream();
+
+    const url = `/automations/${flowId}/events?run_id=${encodeURIComponent(runId)}&timeout_seconds=180`;
+    const source = new EventSource(url);
+    activeRunEventSource = source;
+
+    const handler = (event) => {
+        if (token !== activeRunToken) return;
+        let payload = {};
+        try { payload = JSON.parse(event.data || '{}'); } catch {}
+        applyRunEvent(payload);
+        if (payload.type === 'flow_completed' || payload.type === 'flow_failed') closeRunEventStream();
+    };
+
+    ['flow_started', 'step_started', 'step_completed', 'step_failed', 'delay_started', 'delay_completed', 'flow_completed', 'flow_failed'].forEach(type => {
+        source.addEventListener(type, handler);
+    });
+
+    source.onerror = () => {
+        if (token !== activeRunToken) return;
+        closeRunEventStream();
+    };
+}
+
+function renderVisualizer(flow) {
+    const title  = document.getElementById('flow-visualizer-title');
+    const meta   = document.getElementById('flow-visualizer-meta');
+    const stepsEl = document.getElementById('flow-visualizer-steps');
+    if (!title || !stepsEl) return;
+
+    title.textContent = flow.name;
+
+    const payload = getFlowPayload(flow);
+    const delayMs = payload.step_delay_ms ?? 0;
+    const delayLabel = delayMs > 0 ? ` · ${delayMs >= 1000 ? (delayMs/1000).toFixed(delayMs%1000===0?0:1)+' s' : delayMs+' ms'} between steps` : '';
+    meta.textContent = `${flow.device_kind.replace('_', ' ')} · ${flow.trigger_type}${delayLabel}`;
+
+    const actions = getFlowActions(flow, payload);
+
+    if (actions.length === 0) {
+        stepsEl.innerHTML = '<div class="notice">No steps to display.</div>';
+        return;
+    }
+
+    stepsEl.innerHTML = actions.map((action, i) => {
+        const type    = action.type || action.action_type || '';
+        const icon    = STEP_ICONS[type] || '▸';
+        const summary = stepSummary({ type, payload: action.payload || {} });
+        const isLast  = i === actions.length - 1;
+        const delayLabel = delayMs >= 1000 ? (delayMs/1000).toFixed(delayMs%1000===0?0:1)+' s' : delayMs+' ms';
+        return `
+            <div class="viz-step" data-step-index="${i}">
+                <div class="viz-step-icon">${icon}</div>
+                <div class="viz-step-body">
+                    <div class="viz-step-num">Step ${i + 1}</div>
+                    <div class="viz-step-label">${escapeHtml(summary)}</div>
+                </div>
+            </div>
+            ${!isLast ? `<div class="viz-link" data-link-index="${i}"><span class="viz-arrow">→</span>${delayMs > 0 ? `<span class="viz-delay">${delayLabel}</span>` : ''}</div>` : ''}
+        `;
+    }).join('');
+
+    activeVisualizerFlow = flow;
+}
+
+async function previewFlow(flowId, event) {
+    // Don't trigger when clicking buttons inside the row
+    if (event.target.closest('button')) return;
+
+    if (!document.getElementById('flow-visualizer')) return;
+
+    // Toggle off if same row clicked again
+    if (activePreviewId === flowId) {
+        closeVisualizer();
+        return;
+    }
+
+    showVisualizer(flowId, true);
+
+    try {
+        const flow = await fetchFlow(flowId);
+        renderVisualizer(flow);
+    } catch (err) {
+        document.getElementById('flow-visualizer-steps').innerHTML = `<div class="notice">${escapeHtml(String(err))}</div>`;
+    }
+}
+
+function closeVisualizer() {
+    closeRunEventStream();
+    const visualizer = document.getElementById('flow-visualizer');
+    if (visualizer) visualizer.classList.add('hidden');
+    document.querySelectorAll('.flow-table-row, .flow-card').forEach(el => el.classList.remove('is-previewing'));
+    activePreviewId = null;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setEditMode(false);
+    populateDeviceSelect();
+    updatePaletteForKind();
     renderSteps();
     loadAppsForDevice(false);
 });
 
 async function runFlow(id) {
-    const res = await fetch(`/automations/${id}/run`, { method: 'POST' });
-    const data = await res.json();
-    alert(res.ok ? '✅ Flow triggered: ' + JSON.stringify(data.action || data) : '❌ ' + (data.detail || 'Error'));
+    activeRunToken += 1;
+    const runToken = activeRunToken;
+    const runId = newRunId();
+
+    try {
+        showVisualizer(id, false);
+
+        let flow = activeVisualizerFlow;
+        if (!flow || String(flow.id) !== String(id)) {
+            document.getElementById('flow-visualizer-steps').innerHTML = '<div class="notice">Loading...</div>';
+            flow = await fetchFlow(id);
+            if (runToken !== activeRunToken) return;
+            renderVisualizer(flow);
+        } else {
+            renderVisualizer(flow);
+        }
+
+        resetVisualizerStepState();
+        startRunEventStream(id, runId, runToken);
+
+        const runRequest = fetch(`/automations/${id}/run?run_id=${encodeURIComponent(runId)}`, { method: 'POST' });
+        if (runToken !== activeRunToken) return;
+
+        const res = await runRequest;
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            closeRunEventStream();
+            alert('❌ ' + (data.detail || 'Error'));
+            return;
+        }
+
+        await sleep(150);
+        closeRunEventStream();
+        alert('✅ Flow triggered: ' + JSON.stringify(data.action || data));
+    } catch (err) {
+        closeRunEventStream();
+        alert('❌ ' + String(err));
+    }
 }
 
 async function deleteFlow(id) {
@@ -601,12 +871,7 @@ async function deleteFlow(id) {
 }
 
 function escapeHtml(value) {
-    return String(value)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+    return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 }
 </script>
 {% endblock %}

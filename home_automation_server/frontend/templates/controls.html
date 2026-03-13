@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Controls · Home Automation Server{% endblock %}
 
+{% block header_subnav %}
+{% if controls_devices %}
+<div class="header-subnav">
+    <div class="header-subnav-inner">
+        {% for device in controls_devices %}
+        <a
+            href="{{ device.route }}"
+            class="header-subnav-link{% if device.is_selected %} is-active{% endif %}"
+            {% if device.is_selected %}aria-current="page"{% endif %}
+        >
+            {% if device.kind == 'apple_tv' %}
+            {{ device.name }} (Apple TV)
+            {% else %}
+            {{ device.name }}
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1>Device Controls</h1>
@@ -11,111 +33,120 @@
     <button type="button" class="btn btn-sm btn-secondary" onclick="clearErrorBanner()" aria-label="Dismiss error">✕</button>
 </div>
 
-{% if not devices %}
+<div
+    id="controls-page-data"
+    data-selected-device-id="{{ selected_device.id if selected_device else '' }}"
+    data-selected-device-kind="{{ selected_device_kind or '' }}"
+></div>
+
+{% if not controls_devices %}
 <div class="notice">No devices saved. <a href="/ui/devices">Add a device first.</a></div>
 {% else %}
-<div class="card-form">
-    <h2>Target Device</h2>
-    <form class="form" onsubmit="return false;">
-        <label>Device
-            <select id="control-device-id">
-                {% for device in devices %}
-                <option value="{{ device.id }}">{{ device.name }} ({{ device.ip_address }})</option>
-                {% endfor %}
-            </select>
-        </label>
-    </form>
-    <div id="control-status" class="notice hidden"></div>
-</div>
-
-<div class="card-form">
-    <h2>Directional</h2>
-    <div class="controls-direction-grid">
-        <div></div>
-        <button class="btn btn-secondary" onclick="sendCmd('up')">⬆ Up</button>
-        <div></div>
-
-        <button class="btn btn-secondary" onclick="sendCmd('left')">⬅ Left</button>
-        <button class="btn btn-primary" onclick="sendCmd('select')">Select</button>
-        <button class="btn btn-secondary" onclick="sendCmd('right')">Right ➡</button>
-
-        <div></div>
-        <button class="btn btn-secondary" onclick="sendCmd('down')">⬇ Down</button>
-        <div></div>
-    </div>
-</div>
-
-<div class="card-form">
-    <h2>Navigation</h2>
-    <div class="controls-button-row">
-        <button class="btn btn-secondary" onclick="sendCmd('menu')">☰ Menu</button>
-        <button class="btn btn-secondary" onclick="sendCmd('top_menu')">⌂ Top Menu</button>
-        <button class="btn btn-secondary" onclick="sendCmd('home')">📺 TV / Home</button>
-        <button class="btn btn-secondary" onclick="sendCmd('home_hold')">⏏ Home Hold</button>
-    </div>
-</div>
-
-<div class="card-form">
-    <h2>Playback</h2>
-    <div class="controls-button-row">
-        <button class="btn btn-secondary" onclick="sendCmd('skip_backward')">⏪ Skip Back</button>
-        <button class="btn btn-secondary" onclick="sendCmd('previous')">⏮ Previous</button>
-        <button class="btn btn-secondary" onclick="sendCmd('play')">▶ Play</button>
-        <button class="btn btn-primary"   onclick="sendCmd('play_pause')">⏯ Play / Pause</button>
-        <button class="btn btn-secondary" onclick="sendCmd('pause')">⏸ Pause</button>
-        <button class="btn btn-secondary" onclick="sendCmd('stop')">⏹ Stop</button>
-        <button class="btn btn-secondary" onclick="sendCmd('next')">⏭ Next</button>
-        <button class="btn btn-secondary" onclick="sendCmd('skip_forward')">⏩ Skip Fwd</button>
-    </div>
-</div>
-
-<div class="card-form">
-    <h2>Volume</h2>
-    <div class="controls-button-row">
-        <button class="btn btn-secondary" onclick="sendCmd('volume_down')">🔉 Volume -</button>
-        <button class="btn btn-secondary" onclick="sendCmd('volume_up')">🔊 Volume +</button>
-    </div>
-</div>
-
-<div class="card-form">
-    <h2>Power</h2>
-    <div class="controls-button-row">
-        <button class="btn btn-success" onclick="sendPower(true)">Power On</button>
-        <button class="btn btn-danger" onclick="sendPower(false)">Power Off</button>
-        <button class="btn btn-secondary" onclick="refreshPowerState()">🔄 Refresh State</button>
-    </div>
-    <div class="controls-power-state-row">
-        <span>Current state:</span>
-        <span id="power-state-badge" class="badge">Unknown</span>
-    </div>
-</div>
-
-<div class="card-form">
-    <div class="page-header controls-apps-header">
-        <h2>Installed Apps</h2>
-        <button class="btn btn-secondary" onclick="fetchApps()">📋 List Apps</button>
+{% if selected_device %}
+<section class="controls-provider-section">
+    <div class="page-header controls-provider-header">
+        <div>
+            <h2>
+                {% if selected_device_kind == 'apple_tv' %}
+                Apple TV Remote
+                {% else %}
+                Samsung TV Remote
+                {% endif %}
+            </h2>
+            <p class="subtitle">
+                {% if selected_device_kind == 'apple_tv' %}
+                Directional, playback, power, and installed-app controls for {{ selected_device.name }}.
+                {% else %}
+                Samsung key commands, power actions, and manual app launch for {{ selected_device.name }}.
+                {% endif %}
+            </p>
+        </div>
     </div>
 
-    <form class="form" onsubmit="launchBundleId(event)">
-        <label>Launch by Bundle ID
-            <input type="text" id="manual-bundle-id" placeholder="com.netflix.Netflix" />
-        </label>
-        <button type="submit" class="btn btn-primary">🚀 Launch Bundle ID</button>
-    </form>
+    <button
+        type="button"
+        id="automation-recorder-launcher"
+        class="automation-recorder-launcher"
+        onclick="toggleRecorderDrawer()"
+        aria-expanded="false"
+        aria-controls="automation-recorder"
+    >
+        Open Recorder
+    </button>
 
-    <div id="apps-status" class="notice hidden"></div>
-    <div id="apps-results" class="hidden controls-apps-results"></div>
-</div>
+    <aside id="automation-recorder" class="automation-recorder-drawer" aria-label="Automation recorder">
+        <div class="automation-recorder">
+            <div class="automation-recorder-header">
+                <h3>Record automation</h3>
+                <div class="automation-recorder-header-actions">
+                    <span id="recording-indicator" class="badge">Idle</span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleRecorderDrawer()">Close</button>
+                </div>
+            </div>
+            <p class="subtitle">Capture your button presses, keep realistic waits, then save as a sequence flow.</p>
+            <div class="automation-recorder-controls">
+                <label>Flow name
+                    <input type="text" id="recording-flow-name" placeholder="Recorded flow" />
+                </label>
+                <label>Wait sensitivity
+                    <input type="range" id="recording-wait-threshold" min="100" max="1500" step="50" value="300" oninput="updateRecorderSensitivityLabel()" />
+                    <span id="recording-wait-threshold-value" class="mono">300 ms min gap</span>
+                </label>
+                <div class="controls-button-row">
+                    <button type="button" class="btn btn-danger" id="recording-start-btn" onclick="startRecording()">Start Recording</button>
+                    <button type="button" class="btn btn-secondary" id="recording-stop-btn" onclick="stopRecording()" disabled>Stop</button>
+                    <button type="button" class="btn btn-secondary" id="recording-clear-btn" onclick="clearRecording()" disabled>Clear</button>
+                    <button type="button" class="btn btn-success" id="recording-save-btn" onclick="saveRecordingAsFlow()" disabled>Save as Flow</button>
+                </div>
+                <div class="automation-recorder-log-anchor">
+                    <button type="button" class="btn btn-sm btn-secondary" id="recording-log-toggle" onclick="toggleRecordingLog()">Live Log</button>
+                    <div id="recording-log-popover" class="recording-log-popover hidden">
+                        <div class="recording-log-header">
+                            <strong>Live Log</strong>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="toggleRecordingLog(false)">✕</button>
+                        </div>
+                        <div id="recording-log-entries" class="recording-log-entries"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="recording-status" class="notice hidden"></div>
+            <div id="recording-preview" class="notice hidden"></div>
+        </div>
+    </aside>
+
+    <div id="recording-pulse-overlay" class="recording-pulse-overlay hidden" aria-live="polite">
+        <span class="recording-pulse-dot" aria-hidden="true"></span>
+        <span id="recording-pulse-text">REC</span>
+    </div>
+
+    {% if selected_device_kind == 'apple_tv' %}
+    {% include "partials/controls_appletv.html" %}
+    {% elif selected_device_kind == 'samsung_tv' %}
+    {% include "partials/controls_samsung.html" %}
+    {% endif %}
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-function selectedDeviceId() {
-    return parseInt(document.getElementById('control-device-id').value, 10);
-}
+const controlsPageData = document.getElementById('controls-page-data');
+const selectedDeviceId = controlsPageData && controlsPageData.dataset.selectedDeviceId
+    ? parseInt(controlsPageData.dataset.selectedDeviceId, 10)
+    : null;
+const selectedDeviceKind = controlsPageData && controlsPageData.dataset.selectedDeviceKind
+    ? controlsPageData.dataset.selectedDeviceKind
+    : null;
 
 let errorBannerTimer = null;
+let isRecording = false;
+let recordingActions = [];
+let lastRecordedAtMs = 0;
+let recordingPulseTimer = null;
+let isRecorderDrawerOpen = false;
+let isRecordingLogOpen = false;
+let recordingLogEntries = [];
 
 function clearErrorBanner() {
     const banner = document.getElementById('controls-error-banner');
@@ -149,32 +180,291 @@ function showErrorBanner(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const selector = document.getElementById('control-device-id');
-    if (selector) {
-        selector.addEventListener('change', () => {
-            clearAppsResults();
-            refreshPowerState();
-        });
-    }
     clearErrorBanner();
-    refreshPowerState();
+    clearNotice('control-status');
+    clearNotice('atv-apps-status');
+    clearNotice('samsung-status');
+    clearNotice('samsung-app-status');
+    if (selectedDeviceKind === 'apple_tv') {
+        atvClearAppsResults();
+        atvRefreshPower();
+    }
+    setRecorderDrawerOpen(false);
+    toggleRecordingLog(false);
+    updateRecorderSensitivityLabel();
+    refreshRecorderUi();
 });
 
-function setStatus(message, ok = true) {
-    const box = document.getElementById('control-status');
+function getRecordingWaitThresholdMs() {
+    const raw = document.getElementById('recording-wait-threshold')?.value || '300';
+    return Math.max(0, parseInt(raw, 10) || 300);
+}
+
+function pushRecordingLog(message) {
+    recordingLogEntries.unshift({ ts: new Date(), message: String(message || '') });
+    recordingLogEntries = recordingLogEntries.slice(0, 10);
+    renderRecordingLog();
+}
+
+function renderRecordingLog() {
+    const container = document.getElementById('recording-log-entries');
+    if (!container) return;
+    if (recordingLogEntries.length === 0) {
+        container.innerHTML = '<div class="subtitle">No entries yet.</div>';
+        return;
+    }
+    container.innerHTML = recordingLogEntries.map(entry => {
+        const hh = String(entry.ts.getHours()).padStart(2, '0');
+        const mm = String(entry.ts.getMinutes()).padStart(2, '0');
+        const ss = String(entry.ts.getSeconds()).padStart(2, '0');
+        return `<div class="recording-log-entry"><span class="mono">${hh}:${mm}:${ss}</span> ${escapeHtml(entry.message)}</div>`;
+    }).join('');
+}
+
+function setRecorderDrawerOpen(open) {
+    const drawer = document.getElementById('automation-recorder');
+    const launcher = document.getElementById('automation-recorder-launcher');
+    if (!drawer || !launcher) return;
+    isRecorderDrawerOpen = !!open;
+    drawer.classList.toggle('is-open', isRecorderDrawerOpen);
+    launcher.textContent = isRecorderDrawerOpen ? 'Close Recorder' : 'Open Recorder';
+    launcher.setAttribute('aria-expanded', isRecorderDrawerOpen ? 'true' : 'false');
+}
+
+function toggleRecorderDrawer(forceOpen) {
+    if (typeof forceOpen === 'boolean') {
+        setRecorderDrawerOpen(forceOpen);
+        return;
+    }
+    setRecorderDrawerOpen(!isRecorderDrawerOpen);
+}
+
+function toggleRecordingLog(forceOpen) {
+    const popover = document.getElementById('recording-log-popover');
+    if (!popover) return;
+    if (typeof forceOpen === 'boolean') {
+        isRecordingLogOpen = forceOpen;
+    } else {
+        isRecordingLogOpen = !isRecordingLogOpen;
+    }
+    popover.classList.toggle('hidden', !isRecordingLogOpen);
+    renderRecordingLog();
+}
+
+function updateRecorderSensitivityLabel() {
+    const label = document.getElementById('recording-wait-threshold-value');
+    if (label) label.textContent = `${getRecordingWaitThresholdMs()} ms min gap`;
+}
+
+function setRecordingStatus(message, ok = true) {
+    const box = document.getElementById('recording-status');
+    if (!box) return;
+    if (!message) {
+        box.classList.add('hidden');
+        box.textContent = '';
+        return;
+    }
+    box.classList.remove('hidden');
+    box.textContent = (ok ? 'OK: ' : 'Error: ') + message;
+    if (message) pushRecordingLog((ok ? 'OK ' : 'Error ') + message);
+}
+
+function setRecordingIndicator() {
+    const indicator = document.getElementById('recording-indicator');
+    if (!indicator) return;
+    indicator.textContent = isRecording ? 'Recording' : 'Idle';
+    indicator.style.borderColor = isRecording ? 'var(--danger)' : '';
+    indicator.style.color = isRecording ? 'var(--danger)' : '';
+}
+
+function setRecordingPulseVisible(visible) {
+    const overlay = document.getElementById('recording-pulse-overlay');
+    if (!overlay) return;
+    overlay.classList.toggle('hidden', !visible);
+    if (!visible) overlay.classList.remove('is-flash');
+}
+
+function actionLabel(type, payload) {
+    if (type === 'remote_command') return String(payload?.command || 'command');
+    if (type === 'power') return payload?.turn_on ? 'power on' : 'power off';
+    if (type === 'launch_app') return `launch ${payload?.bundle_id || payload?.app_id || 'app'}`;
+    if (type === 'wait_seconds') return `wait ${payload?.seconds || '?'}s`;
+    return type;
+}
+
+function flashRecordingPulse(type, payload) {
+    if (!isRecording) return;
+    const overlay = document.getElementById('recording-pulse-overlay');
+    const text = document.getElementById('recording-pulse-text');
+    if (!overlay || !text) return;
+
+    text.textContent = `REC ${recordingActions.length}: ${actionLabel(type, payload)}`;
+    overlay.classList.remove('hidden');
+    overlay.classList.remove('is-flash');
+    void overlay.offsetWidth;
+    overlay.classList.add('is-flash');
+
+    if (recordingPulseTimer) clearTimeout(recordingPulseTimer);
+    recordingPulseTimer = setTimeout(() => {
+        if (!isRecording) setRecordingPulseVisible(false);
+    }, 700);
+}
+
+function refreshRecorderPreview() {
+    const preview = document.getElementById('recording-preview');
+    if (!preview) return;
+    if (recordingActions.length === 0) {
+        preview.classList.add('hidden');
+        preview.textContent = '';
+        return;
+    }
+    const lines = recordingActions.map((action, index) => {
+        if (action.type === 'wait_seconds') return `${index + 1}. Wait ${action.payload.seconds}s`;
+        if (action.type === 'remote_command') return `${index + 1}. ${action.payload.command}`;
+        if (action.type === 'power') return `${index + 1}. Power ${action.payload.turn_on ? 'On' : 'Off'}`;
+        if (action.type === 'launch_app') return `${index + 1}. Launch ${action.payload.bundle_id || action.payload.app_id || '?'}`;
+        return `${index + 1}. ${action.type}`;
+    });
+    preview.classList.remove('hidden');
+    preview.textContent = lines.join('  |  ');
+}
+
+function refreshRecorderUi() {
+    const startBtn = document.getElementById('recording-start-btn');
+    const stopBtn = document.getElementById('recording-stop-btn');
+    const clearBtn = document.getElementById('recording-clear-btn');
+    const saveBtn = document.getElementById('recording-save-btn');
+    if (startBtn) startBtn.disabled = isRecording;
+    if (stopBtn) stopBtn.disabled = !isRecording;
+    if (clearBtn) clearBtn.disabled = isRecording || recordingActions.length === 0;
+    if (saveBtn) saveBtn.disabled = isRecording || recordingActions.length === 0;
+    setRecordingIndicator();
+    setRecordingPulseVisible(isRecording);
+    if (isRecording) {
+        const pulseText = document.getElementById('recording-pulse-text');
+        if (pulseText) pulseText.textContent = `REC ${recordingActions.length}`;
+    }
+    refreshRecorderPreview();
+}
+
+function startRecording() {
+    clearErrorBanner();
+    setRecorderDrawerOpen(true);
+    recordingActions = [];
+    recordingLogEntries = [];
+    renderRecordingLog();
+    lastRecordedAtMs = 0;
+    isRecording = true;
+    setRecordingStatus('Recording started. Use remote controls to capture a flow.');
+    refreshRecorderUi();
+}
+
+function stopRecording() {
+    isRecording = false;
+    setRecordingStatus(`Recording stopped. Captured ${recordingActions.length} step(s).`);
+    refreshRecorderUi();
+}
+
+function clearRecording() {
+    recordingActions = [];
+    lastRecordedAtMs = 0;
+    setRecordingStatus('Recording cleared.');
+    refreshRecorderUi();
+}
+
+function maybeRecordWait(nowMs) {
+    if (!lastRecordedAtMs) return;
+    const gapMs = nowMs - lastRecordedAtMs;
+    const thresholdMs = getRecordingWaitThresholdMs();
+    if (gapMs < thresholdMs) return;
+    const seconds = Math.max(0.1, Math.round((gapMs / 1000) * 10) / 10);
+    recordingActions.push({ type: 'wait_seconds', payload: { seconds } });
+    pushRecordingLog(`Auto wait inserted: ${seconds}s`);
+}
+
+function recordAction(type, payload) {
+    if (!isRecording) return;
+    const nowMs = Date.now();
+    maybeRecordWait(nowMs);
+    recordingActions.push({ type, payload: payload || {} });
+    flashRecordingPulse(type, payload);
+    pushRecordingLog(`Captured: ${actionLabel(type, payload)}`);
+    lastRecordedAtMs = nowMs;
+    setRecordingStatus(`Recorded ${recordingActions.length} step(s).`);
+    refreshRecorderUi();
+}
+
+async function saveRecordingAsFlow() {
+    if (recordingActions.length === 0) {
+        setRecordingStatus('Nothing recorded yet.', false);
+        return;
+    }
+    if (!Number.isInteger(selectedDeviceId) || !selectedDeviceKind) {
+        setRecordingStatus('No selected device found for saving this flow.', false);
+        return;
+    }
+
+    const flowNameInput = document.getElementById('recording-flow-name');
+    const flowName = (flowNameInput?.value || '').trim() || `Recorded ${selectedDeviceKind} flow ${new Date().toLocaleString()}`;
+    const payload = {
+        name: flowName,
+        device_kind: selectedDeviceKind,
+        device_id: selectedDeviceId,
+        trigger_type: 'manual',
+        trigger_payload: '{}',
+        action_type: 'sequence',
+        action_payload: JSON.stringify({ actions: recordingActions }),
+    };
+
+    try {
+        clearErrorBanner();
+        const res = await fetch('/automations/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg = data.detail || 'Failed to save recorded automation';
+            setRecordingStatus(msg, false);
+            showErrorBanner(msg);
+            return;
+        }
+        setRecordingStatus(`Saved flow "${flowName}" with ${recordingActions.length} step(s).`);
+        isRecording = false;
+        toggleRecordingLog(false);
+        refreshRecorderUi();
+    } catch (err) {
+        const msg = String(err);
+        setRecordingStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+function requireSelectedDeviceId(label) {
+    if (!Number.isInteger(selectedDeviceId)) {
+        throw new Error(`Select a ${label} device first`);
+    }
+    return selectedDeviceId;
+}
+
+function setNotice(elementId, message, ok = true) {
+    const box = document.getElementById(elementId);
+    if (!box) return;
     box.classList.remove('hidden');
     box.textContent = (ok ? '✅ ' : '❌ ') + message;
 }
 
-function setAppsStatus(message, ok = true) {
-    const box = document.getElementById('apps-status');
-    box.classList.remove('hidden');
-    box.textContent = (ok ? '✅ ' : '❌ ') + message;
+function clearNotice(elementId) {
+    const box = document.getElementById(elementId);
+    if (!box) return;
+    box.classList.add('hidden');
+    box.textContent = '';
 }
 
-function clearAppsResults() {
-    const results = document.getElementById('apps-results');
-    const status = document.getElementById('apps-status');
+function clearAppsResults(resultsId, statusId) {
+    const results = document.getElementById(resultsId);
+    const status = document.getElementById(statusId);
     if (results) {
         results.classList.add('hidden');
         results.innerHTML = '';
@@ -185,8 +475,8 @@ function clearAppsResults() {
     }
 }
 
-function setPowerStateBadge(state, ok = true) {
-    const badge = document.getElementById('power-state-badge');
+function setPowerStateBadge(badgeId, state, ok = true) {
+    const badge = document.getElementById(badgeId);
     if (!badge) return;
 
     const normalized = String(state || 'unknown').toLowerCase();
@@ -215,87 +505,106 @@ function setPowerStateBadge(state, ok = true) {
     }
 }
 
-async function refreshPowerState() {
+function atvSelectedDeviceId() {
+    return requireSelectedDeviceId('Apple TV');
+}
+
+function atvSetStatus(message, ok = true) {
+    setNotice('control-status', message, ok);
+}
+
+function atvSetAppsStatus(message, ok = true) {
+    setNotice('atv-apps-status', message, ok);
+}
+
+function atvClearAppsResults() {
+    clearAppsResults('atv-apps-results', 'atv-apps-status');
+}
+
+async function atvRefreshPower() {
     try {
         clearErrorBanner();
-        const res = await fetch(`/controls/power-state/${selectedDeviceId()}`);
+        const res = await fetch(`/controls/power-state/${atvSelectedDeviceId()}`);
         const data = await res.json();
         if (!res.ok) {
-            setPowerStateBadge('unknown', false);
+            setPowerStateBadge('atv-power-badge', 'unknown', false);
             if (res.status !== 501) {
                 const msg = data.detail || 'Failed to get power state';
-                setStatus(msg, false);
+                atvSetStatus(msg, false);
                 showErrorBanner(msg);
             } else {
                 const msg = data.detail || 'Power state not supported on this device';
-                setStatus(msg, false);
+                atvSetStatus(msg, false);
             }
             return;
         }
-        setPowerStateBadge(data.power_state, true);
+        setPowerStateBadge('atv-power-badge', data.power_state, true);
     } catch (err) {
-        setPowerStateBadge('unknown', false);
+        setPowerStateBadge('atv-power-badge', 'unknown', false);
         const msg = String(err);
-        setStatus(msg, false);
+        atvSetStatus(msg, false);
         showErrorBanner(msg);
     }
 }
 
-async function sendCmd(command) {
+async function atvCmd(command) {
     try {
         clearErrorBanner();
-        const res = await fetch('/controls/command', {
+        const res = await fetch('/controls/appletv/command', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ device_id: selectedDeviceId(), command })
+            body: JSON.stringify({ device_id: atvSelectedDeviceId(), command })
         });
         const data = await res.json();
         if (!res.ok) {
             const msg = data.detail || 'Failed to send command';
-            setStatus(msg, false);
+            atvSetStatus(msg, false);
             showErrorBanner(msg);
             return;
         }
-        setStatus(`Sent command: ${command}`);
+        atvSetStatus(`Sent command: ${command}`);
+        recordAction('remote_command', { command });
     } catch (err) {
         const msg = String(err);
-        setStatus(msg, false);
+        atvSetStatus(msg, false);
         showErrorBanner(msg);
     }
 }
 
-async function sendPower(turnOn) {
+async function atvPower(turnOn) {
     try {
         clearErrorBanner();
-        const res = await fetch('/controls/power', {
+        const res = await fetch('/controls/appletv/power', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ device_id: selectedDeviceId(), turn_on: turnOn })
+            body: JSON.stringify({ device_id: atvSelectedDeviceId(), turn_on: turnOn })
         });
         const data = await res.json();
         if (!res.ok) {
             const msg = data.detail || 'Failed to change power state';
-            setStatus(msg, false);
+            atvSetStatus(msg, false);
             showErrorBanner(msg);
             return;
         }
-        setStatus(`Power ${turnOn ? 'on' : 'off'} command sent`);
-        setTimeout(refreshPowerState, 1200);
+        atvSetStatus(`Power ${turnOn ? 'on' : 'off'} command sent`);
+        recordAction('power', { turn_on: turnOn });
+        setTimeout(atvRefreshPower, 1200);
     } catch (err) {
         const msg = String(err);
-        setStatus(msg, false);
+        atvSetStatus(msg, false);
         showErrorBanner(msg);
     }
 }
 
-async function fetchApps() {
-    const results = document.getElementById('apps-results');
+async function atvFetchApps() {
+    const results = document.getElementById('atv-apps-results');
+    if (!results) return;
     results.classList.remove('hidden');
     results.innerHTML = '⏳ Loading installed apps…';
 
     try {
         clearErrorBanner();
-        const res = await fetch(`/apps/list/${selectedDeviceId()}`);
+        const res = await fetch(`/apps/list/${atvSelectedDeviceId()}`);
         const data = await res.json();
         if (!res.ok) {
             results.innerHTML = '';
@@ -309,7 +618,7 @@ async function fetchApps() {
                 `;
             }
             const msg = data.detail || 'Failed to list apps';
-            setAppsStatus(msg, false);
+            atvSetAppsStatus(msg, false);
             if (res.status !== 501) {
                 showErrorBanner(msg);
             }
@@ -318,7 +627,7 @@ async function fetchApps() {
 
         if (data.length === 0) {
             results.innerHTML = '<div class="notice">No apps returned by the device.</div>';
-            setAppsStatus('App list loaded');
+            atvSetAppsStatus('App list loaded');
             return;
         }
 
@@ -337,55 +646,174 @@ async function fetchApps() {
                             <td>${escapeHtml(app.name || 'Unknown')}</td>
                             <td class="mono">${escapeHtml(app.bundle_id || '')}</td>
                             <td>
-                                <button class="btn btn-sm btn-success" onclick="launchApp('${escapeJs(app.bundle_id || '')}')">Launch</button>
+                                <button class="btn btn-sm btn-success" onclick="atvLaunchApp('${escapeJs(app.bundle_id || '')}')">Launch</button>
                             </td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         `;
-        setAppsStatus(`Loaded ${data.length} app(s)`);
+        atvSetAppsStatus(`Loaded ${data.length} app(s)`);
     } catch (err) {
         results.innerHTML = '';
         const msg = String(err);
-        setAppsStatus(msg, false);
+        atvSetAppsStatus(msg, false);
         showErrorBanner(msg);
     }
 }
 
-async function launchApp(bundleId) {
+async function atvLaunchApp(bundleId) {
     try {
         clearErrorBanner();
-        const res = await fetch('/apps/launch', {
+        const res = await fetch('/apps/appletv/launch', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ device_id: selectedDeviceId(), bundle_id: bundleId })
+            body: JSON.stringify({ device_id: atvSelectedDeviceId(), bundle_id: bundleId })
         });
         const data = await res.json();
         if (!res.ok) {
             const msg = data.detail || 'Failed to launch app';
-            setAppsStatus(msg, false);
+            atvSetAppsStatus(msg, false);
             showErrorBanner(msg);
             return;
         }
-        setAppsStatus(`Launched ${bundleId}`);
+        atvSetAppsStatus(`Launched ${bundleId}`);
+        recordAction('launch_app', { bundle_id: bundleId });
     } catch (err) {
         const msg = String(err);
-        setAppsStatus(msg, false);
+        atvSetAppsStatus(msg, false);
         showErrorBanner(msg);
     }
 }
 
-async function launchBundleId(event) {
+async function atvLaunchBundle(event) {
     event.preventDefault();
-    const bundleId = document.getElementById('manual-bundle-id').value.trim();
+    const bundleId = document.getElementById('atv-bundle-id').value.trim();
     if (!bundleId) {
         const msg = 'Enter a bundle ID first';
-        setAppsStatus(msg, false);
+        atvSetAppsStatus(msg, false);
         showErrorBanner(msg);
         return;
     }
-    await launchApp(bundleId);
+    await atvLaunchApp(bundleId);
+}
+
+function samsungSelectedDeviceId() {
+    return requireSelectedDeviceId('Samsung TV');
+}
+
+function samsungSetStatus(message, ok = true) {
+    setNotice('samsung-status', message, ok);
+}
+
+function samsungSetAppStatus(message, ok = true) {
+    setNotice('samsung-app-status', message, ok);
+}
+
+
+async function samsungCmd(command) {
+    try {
+        clearErrorBanner();
+        const res = await fetch('/controls/samsung/command', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: samsungSelectedDeviceId(), command })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = data.detail || 'Failed to send Samsung command';
+            samsungSetStatus(msg, false);
+            showErrorBanner(msg);
+            return;
+        }
+        samsungSetStatus(`Sent command: ${command}`);
+        recordAction('remote_command', { command });
+    } catch (err) {
+        const msg = String(err);
+        samsungSetStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+async function samsungPower(turnOn) {
+    try {
+        clearErrorBanner();
+        const res = await fetch('/controls/samsung/power', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: samsungSelectedDeviceId(), turn_on: turnOn })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = data.detail || 'Failed to change Samsung power state';
+            samsungSetStatus(msg, false);
+            showErrorBanner(msg);
+            return;
+        }
+        samsungSetStatus(`Power ${turnOn ? 'on' : 'off'} command sent`);
+        recordAction('power', { turn_on: turnOn });
+    } catch (err) {
+        const msg = String(err);
+        samsungSetStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+async function samsungLaunchApp(event) {
+    event.preventDefault();
+    const appId = document.getElementById('samsung-app-id').value.trim();
+    if (!appId) {
+        const msg = 'Enter a Samsung app ID first';
+        samsungSetAppStatus(msg, false);
+        showErrorBanner(msg);
+        return;
+    }
+
+    try {
+        clearErrorBanner();
+        const res = await fetch('/apps/samsung/launch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ device_id: samsungSelectedDeviceId(), app_id: appId })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const msg = data.detail || 'Failed to launch Samsung app';
+            samsungSetAppStatus(msg, false);
+            showErrorBanner(msg);
+            return;
+        }
+        samsungSetAppStatus(`Launched ${appId}`);
+        recordAction('launch_app', { app_id: appId });
+    } catch (err) {
+        const msg = String(err);
+        samsungSetAppStatus(msg, false);
+        showErrorBanner(msg);
+    }
+}
+
+async function samsungFetchSources() {
+    try {
+        clearErrorBanner();
+        const res = await fetch(`/controls/samsung/sources/${samsungSelectedDeviceId()}`);
+        const data = await res.json();
+        if (!res.ok) {
+            showErrorBanner(data.detail || 'Failed to fetch sources');
+            return;
+        }
+        // Re-render the companion grid with the authoritative input list from the server
+        const grid = document.getElementById('samsung-inputs-grid');
+        if (!grid || !data.inputs) return;
+        grid.innerHTML = data.inputs.map(input => `
+            <button class="samsung-input-companion-btn" onclick="samsungCmd('${escapeJs(input.command)}')">
+                ${escapeHtml(input.icon)} ${escapeHtml(input.label)}
+            </button>
+        `).join('') + `
+            <button class="samsung-input-companion-btn" onclick="samsungCmd('source')">⬡ Source Menu</button>
+        `;
+    } catch (err) {
+        showErrorBanner(String(err));
+    }
 }
 
 function escapeHtml(value) {

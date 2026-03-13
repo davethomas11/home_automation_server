@@ -4,7 +4,10 @@
 {% block content %}
 <div class="page-header">
     <h1>Apple TV Devices</h1>
-    <button class="btn btn-primary" onclick="scanDevices()">🔍 Scan Network</button>
+    <div class="controls-button-row">
+        <button class="btn btn-primary" onclick="scanDevices()">🔍 Scan Apple TVs</button>
+        <button class="btn btn-primary" onclick="scanSamsungDevices()">📺 Scan Samsung TVs</button>
+    </div>
 </div>
 
 <!-- Scan results (populated by JS) -->
@@ -19,6 +22,14 @@
     </div>
     <div id="scan-summary" class="notice hidden"></div>
     <div id="scan-list"></div>
+</div>
+
+<div id="samsung-scan-results" class="hidden">
+    <div class="page-header" style="margin-top: 1rem;">
+        <h2>Discovered Samsung TVs</h2>
+    </div>
+    <div id="samsung-scan-summary" class="notice hidden"></div>
+    <div id="samsung-scan-list"></div>
 </div>
 
 <!-- Saved devices -->
@@ -115,11 +126,126 @@
         <button type="submit" class="btn btn-primary">Save Device</button>
     </form>
 </details>
+
+<h2 style="margin-top:2rem;">Samsung TV Devices</h2>
+<details class="collapsible" open>
+    <summary>⚡ Quick Add Samsung TV by IP</summary>
+    <form class="form" onsubmit="addSamsungDeviceByIp(event)">
+        <div class="notice">
+            <strong>Finding your TV's IP address:</strong>
+            On your Samsung TV, go to Settings → Network → Status to see your IP.
+            Typical format: 192.168.1.x or 10.0.0.x
+        </div>
+        <label>IP Address <input type="text" id="quick-samsung-ip" required placeholder="192.168.1.50" /></label>
+        <label>Name <input type="text" id="quick-samsung-name" required placeholder="Living Room Samsung" /></label>
+        <label>Model Year
+            <select id="quick-samsung-year" required>
+                <option value="2019">2019 (RU-series)</option>
+                <option value="2020">2020 (TU-series)</option>
+                <option value="2021">2021 (AU-series)</option>
+                <option value="2022">2022 (QN-series)</option>
+                <option value="2023">2023 (S90C+)</option>
+                <option value="2024">2024 (newer)</option>
+            </select>
+        </label>
+        <button type="submit" class="btn btn-primary">Add Samsung TV</button>
+    </form>
+</details>
+
+{% if samsung_devices %}
+<table class="data-table data-table-desktop">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>IP Address</th>
+            <th>Model Year</th>
+            <th>Port</th>
+            <th>Pairing</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for device in samsung_devices %}
+        <tr>
+            <td>{{ device.name }}</td>
+            <td class="mono">{{ device.ip_address }}</td>
+            <td>{{ device.model_year }}</td>
+            <td class="mono">{{ device.port }}</td>
+            <td>
+                {% if device.token %}
+                    <span class="badge badge-action">Paired</span>
+                {% else %}
+                    <span class="badge" style="border-color:#f87171;color:#f87171;">Needs pairing</span>
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="pairSamsungDevice({{ device.id }})">Pair</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSamsungDevice({{ device.id }})">Delete</button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div class="devices-card-grid">
+    {% for device in samsung_devices %}
+        <div class="device-card">
+            <div class="device-card-header">
+                <h3>{{ device.name }}</h3>
+            </div>
+            <div class="device-card-body">
+                <div class="device-info-row">
+                    <span class="device-label">IP:</span>
+                    <span class="device-value mono">{{ device.ip_address }}</span>
+                </div>
+                <div class="device-info-row">
+                    <span class="device-label">Year:</span>
+                    <span class="device-value">{{ device.model_year }}</span>
+                </div>
+                <div class="device-info-row">
+                    <span class="device-label">Port:</span>
+                    <span class="device-value mono">{{ device.port }}</span>
+                </div>
+                <div class="device-info-row">
+                    <span class="device-label">Pairing:</span>
+                    <span class="device-value">
+                        {% if device.token %}
+                            <span class="badge badge-action">Paired</span>
+                        {% else %}
+                            <span class="badge" style="border-color:#f87171;color:#f87171;">Needs pairing</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="device-card-actions">
+                <button class="btn btn-sm btn-secondary" onclick="pairSamsungDevice({{ device.id }})">Pair</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSamsungDevice({{ device.id }})">Delete</button>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="notice">No Samsung TVs saved yet.</div>
+{% endif %}
+
+<details class="collapsible">
+    <summary>➕ Add Samsung TV manually</summary>
+    <form class="form" onsubmit="addSamsungDevice(event)">
+        <label>Name <input type="text" id="samsung-name" required placeholder="Basement Samsung" /></label>
+        <label>IP Address <input type="text" id="samsung-ip" required placeholder="192.168.1.50" /></label>
+        <label>Model Year <input type="number" id="samsung-model-year" min="2016" value="2022" required /></label>
+        <label>Port <input type="number" id="samsung-port" min="1" max="65535" value="8002" required /></label>
+        <label>Token (optional) <input type="text" id="samsung-token" placeholder="Paste token if already paired" /></label>
+        <label>MAC Address (optional) <input type="text" id="samsung-mac" placeholder="AA:BB:CC:DD:EE:FF" /></label>
+        <button type="submit" class="btn btn-primary">Save Samsung TV</button>
+    </form>
+</details>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let lastScanned = [];
+let lastSamsungScanned = [];
 
 async function scanDevices() {
     const btn = document.querySelector('button[onclick="scanDevices()"]');
@@ -134,16 +260,26 @@ async function scanDevices() {
         const saved = await savedRes.json();
         const savedByIdentifier = new Set(saved.map(d => d.identifier));
 
-        lastScanned = data.map(d => ({
-            ...d,
-            alreadySaved: savedByIdentifier.has(d.identifier)
-        }));
+        // Filter out Samsung TVs (which advertise AirPlay but should use Samsung WebSocket API)
+        const samsung_identifiers = ["samsung", "un", "qn", "ru", "tu", "au"];
+        const isSamsungTV = (device) => {
+            const name_lower = (device.name || "").toLowerCase();
+            const model_lower = (device.model || "").toLowerCase();
+            return samsung_identifiers.some(id => name_lower.includes(id) || model_lower.includes(id));
+        };
+
+        lastScanned = (Array.isArray(data) ? data : [])
+            .filter(d => !isSamsungTV(d))  // Filter out Samsung TVs
+            .map(d => ({
+                ...d,
+                alreadySaved: savedByIdentifier.has(d.identifier)
+            }));
 
         const list = document.getElementById('scan-list');
         const summary = document.getElementById('scan-summary');
         list.innerHTML = '';
         if (lastScanned.length === 0) {
-            list.innerHTML = '<p class="notice">No devices found.</p>';
+            list.innerHTML = '<p class="notice">No Apple TV devices found.</p>';
             summary.classList.add('hidden');
         } else {
             const existingCount = lastScanned.filter(d => d.alreadySaved).length;
@@ -168,7 +304,7 @@ async function scanDevices() {
     } catch(e) {
         alert('Scan failed: ' + e);
     } finally {
-        btn.textContent = '🔍 Scan Network';
+        btn.textContent = '🔍 Scan Apple TVs';
         btn.disabled = false;
     }
 }
@@ -231,6 +367,142 @@ async function addDevice(e) {
 async function deleteDevice(id) {
     if (!confirm('Delete this device?')) return;
     await fetch(`/devices/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+
+async function addSamsungDevice(e) {
+    e.preventDefault();
+    await fetch('/devices/samsung', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('samsung-name').value,
+            ip_address: document.getElementById('samsung-ip').value,
+            model_year: parseInt(document.getElementById('samsung-model-year').value, 10),
+            port: parseInt(document.getElementById('samsung-port').value, 10),
+            token: document.getElementById('samsung-token').value || null,
+            mac_address: document.getElementById('samsung-mac').value || null,
+        })
+    });
+    location.reload();
+}
+
+async function scanSamsungDevices() {
+    const btn = document.querySelector('button[onclick="scanSamsungDevices()"]');
+    btn.textContent = '⏳ Scanning…';
+    btn.disabled = true;
+    try {
+        const [scanRes, savedRes] = await Promise.all([
+            fetch('/devices/samsung/scan', { method: 'POST' }),
+            fetch('/devices/samsung')
+        ]);
+        const data = await scanRes.json();
+        if (!scanRes.ok) {
+            throw new Error(data.detail || 'Samsung scan failed');
+        }
+        const saved = await savedRes.json();
+        const savedByIpPort = new Set(saved.map(d => `${d.ip_address}:${d.port}`));
+
+        lastSamsungScanned = (Array.isArray(data) ? data : []).map(d => ({
+            ...d,
+            alreadySaved: savedByIpPort.has(`${d.ip_address}:${d.port || 8002}`)
+        }));
+
+        const list = document.getElementById('samsung-scan-list');
+        const summary = document.getElementById('samsung-scan-summary');
+        list.innerHTML = '';
+
+        if (lastSamsungScanned.length === 0) {
+            list.innerHTML = '<p class="notice">No Samsung TVs found.</p>';
+            summary.classList.add('hidden');
+        } else {
+            const existingCount = lastSamsungScanned.filter(d => d.alreadySaved).length;
+            summary.textContent = `${lastSamsungScanned.length} discovered · ${existingCount} already saved`;
+            summary.classList.remove('hidden');
+
+            lastSamsungScanned.forEach((d, idx) => {
+                const badge = d.alreadySaved
+                    ? '<span class="badge" style="border-color:#34d399;color:#34d399;">Already saved</span>'
+                    : '<span class="badge" style="border-color:#7c6af7;color:#7c6af7;">New</span>';
+                const year = d.model_year || 2022;
+                const port = d.port || 8002;
+                list.innerHTML += `
+                <div class="scan-card">
+                    <strong>${d.name || 'Samsung TV'}</strong> · ${d.model || 'Unknown model'}<br/>
+                    <span class="mono">${d.ip_address}:${port}</span> · year ${year}
+                    ${badge}
+                    <button class="btn btn-sm btn-success" ${d.alreadySaved ? 'disabled' : ''} onclick='saveSamsungScanned(${idx})'>Save</button>
+                </div>`;
+            });
+        }
+
+        document.getElementById('samsung-scan-results').classList.remove('hidden');
+    } catch (e) {
+        alert('Samsung scan failed: ' + e);
+    } finally {
+        btn.textContent = '📺 Scan Samsung TVs';
+        btn.disabled = false;
+    }
+}
+
+async function saveSamsungScanned(index) {
+    const d = lastSamsungScanned[index];
+    if (!d) return;
+
+    await fetch('/devices/samsung', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: d.name || 'Samsung TV',
+            ip_address: d.ip_address,
+            model_year: d.model_year || 2022,
+            port: d.port || 8002,
+            token: null,
+            mac_address: null,
+        })
+    });
+    location.reload();
+}
+
+async function pairSamsungDevice(id) {
+    const token = prompt('Optional: paste existing Samsung token (or leave empty)') || null;
+    const res = await fetch(`/devices/samsung/${id}/pair`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        alert('Pairing failed: ' + (data.detail || 'unknown error'));
+        return;
+    }
+    alert(data.has_token
+        ? 'Pairing/auth succeeded and token is saved.'
+        : 'Pairing handshake sent. Approve prompt on TV if shown, then try again.');
+    location.reload();
+}
+
+async function deleteSamsungDevice(id) {
+    if (!confirm('Delete this Samsung TV?')) return;
+    await fetch(`/devices/samsung/${id}`, { method: 'DELETE' });
+    location.reload();
+}
+
+async function addSamsungDeviceByIp(e) {
+    e.preventDefault();
+    const year = document.getElementById('quick-samsung-year').value;
+    await fetch('/devices/samsung', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('quick-samsung-name').value,
+            ip_address: document.getElementById('quick-samsung-ip').value,
+            model_year: parseInt(year, 10),
+            port: 8002,
+            token: null,
+            mac_address: null,
+        })
+    });
     location.reload();
 }
 </script>

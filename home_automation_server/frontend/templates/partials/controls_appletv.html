@@ -1,0 +1,99 @@
+{# ── Apple TV Controls Panel ──────────────────────────────────────────── #}
+{# Expects: selected_device (AppleTVDeviceRead) #}
+
+<div class="remote-page remote-page-apple">
+    <div class="cp-device-selector card-form">
+        <div class="cp-device-summary">
+            <span class="badge">Apple TV</span>
+            <h2 class="cp-device-title">{{ selected_device.name }}</h2>
+            <div class="cp-device-meta mono">{{ selected_device.ip_address }}</div>
+        </div>
+        <div class="cp-power-row">
+            <span class="cp-power-label">Power state:</span>
+            <span id="atv-power-badge" class="badge cp-badge">Unknown</span>
+            <button class="btn btn-sm btn-secondary" onclick="atvRefreshPower()">⟳ Refresh</button>
+        </div>
+    </div>
+
+    <div id="control-status" class="notice hidden"></div>
+
+    <div class="remote-layout remote-layout-apple">
+        <section class="remote-shell remote-shell-apple">
+            <div class="remote-shell-top">
+                <button class="remote-icon-btn remote-icon-btn-danger" onclick="atvPower(false)" aria-label="Power off">⏻</button>
+                <button class="remote-icon-btn" onclick="atvCmd('control_center')" aria-label="Control center">☰</button>
+            </div>
+
+            <div class="remote-touchpad remote-touchpad-apple">
+                <button class="remote-direction remote-direction-up" onclick="atvCmd('up')" aria-label="Up">▲</button>
+                <button class="remote-direction remote-direction-left" onclick="atvCmd('left')" aria-label="Left">◀</button>
+                <button class="remote-direction remote-direction-right" onclick="atvCmd('right')" aria-label="Right">▶</button>
+                <button class="remote-direction remote-direction-down" onclick="atvCmd('down')" aria-label="Down">▼</button>
+                <button class="remote-touchpad-center" onclick="atvCmd('select')" aria-label="Select">OK</button>
+            </div>
+
+            <div class="remote-pill-row remote-pill-row-split">
+                <button class="remote-pill-btn" onclick="atvCmd('menu')">Menu</button>
+                <button class="remote-pill-btn" onclick="atvCmd('home')">Home</button>
+            </div>
+
+            <div class="remote-pill-row remote-pill-row-split">
+                <button class="remote-pill-btn" onclick="atvCmd('top_menu')">Top</button>
+                <button class="remote-pill-btn" onclick="atvCmd('home_hold')">Hold</button>
+            </div>
+
+            <div class="remote-media-cluster">
+                <button class="remote-small-btn" onclick="atvCmd('previous')">⏮</button>
+                <button class="remote-play-btn" onclick="atvCmd('play_pause')">⏯</button>
+                <button class="remote-small-btn" onclick="atvCmd('next')">⏭</button>
+            </div>
+
+            <div class="remote-pill-row remote-pill-row-split">
+                <button class="remote-pill-btn" onclick="atvCmd('volume_down')">Vol −</button>
+                <button class="remote-pill-btn" onclick="atvCmd('volume_up')">Vol +</button>
+            </div>
+        </section>
+
+        <div class="remote-companion-grid">
+            <section class="card-form remote-card">
+                <h3 class="cp-panel-title">Navigation & System</h3>
+                <div class="cp-btn-grid">
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('guide')">📋 Guide</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('screensaver')">💤 Screensaver</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('wakeup')">☀ Wake Up</button>
+                    <button class="btn btn-success cp-btn" onclick="atvPower(true)">⏻ Power On</button>
+                </div>
+            </section>
+
+            <section class="card-form remote-card">
+                <h3 class="cp-panel-title">Playback</h3>
+                <div class="cp-btn-grid">
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('play')">▶ Play</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('pause')">⏸ Pause</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('stop')">⏹ Stop</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('skip_backward')">⏪ Skip Back</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('skip_forward')">⏩ Skip Fwd</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('channel_down')">📺 Ch −</button>
+                    <button class="btn btn-secondary cp-btn" onclick="atvCmd('channel_up')">📺 Ch +</button>
+                </div>
+            </section>
+
+            <section class="card-form remote-card remote-card-wide">
+                <div class="cp-panel-header">
+                    <h3 class="cp-panel-title">Apps</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="atvFetchApps()">📋 List Installed</button>
+                </div>
+                <form class="form" onsubmit="atvLaunchBundle(event)" style="margin-top:0.75rem;">
+                    <label for="atv-bundle-id">Bundle ID</label>
+                    <div class="cp-input-row">
+                        <input type="text" id="atv-bundle-id" placeholder="com.netflix.Netflix" class="cp-input" />
+                        <button type="submit" class="btn btn-primary">🚀 Launch</button>
+                    </div>
+                </form>
+                <div id="atv-apps-status" class="notice hidden" style="margin-top:0.75rem;"></div>
+                <div id="atv-apps-results" class="hidden cp-apps-results"></div>
+            </section>
+        </div>
+    </div>
+</div>
+
